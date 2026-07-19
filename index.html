@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="ブックピース">
+  <meta name="theme-color" content="#2c6e49">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./icons/icon.svg">
+  <link rel="icon" href="./icons/icon.svg">
+  <link rel="stylesheet" href="./style.css">
+  <title>ブックピース</title>
+</head>
+<body>
+
+  <!-- ホーム画面：子供選択 -->
+  <section id="screen-home" class="screen active">
+    <header class="home-header">
+      <div class="home-logo">📖🧩</div>
+      <h1>ブックピース</h1>
+      <p class="home-sub">よんだかんそうを、パズルみたいにくみたてよう</p>
+    </header>
+    <div class="child-picker">
+      <button class="child-btn" data-child="shuya">
+        <span class="avatar">🦖</span>
+        <span class="child-name" data-name="shuya">修也</span>
+      </button>
+      <button class="child-btn" data-child="hiroto">
+        <span class="avatar">🐰</span>
+        <span class="child-name" data-name="hiroto">啓仁</span>
+      </button>
+    </div>
+    <button class="settings-link" data-action="open-settings">⚙️ おうちの人の設定</button>
+  </section>
+
+  <!-- 本棚画面 -->
+  <section id="screen-shelf" class="screen">
+    <header class="bar-header">
+      <button class="back-btn" data-action="back-home">←</button>
+      <div class="bar-title">
+        <span class="shelf-avatar" id="shelf-avatar"><span>🦖</span></span>
+        <h2 id="shelf-title">本棚</h2>
+      </div>
+      <span></span>
+    </header>
+    <div class="shelf-body">
+      <button class="new-book-btn" data-action="new-book">＋ あたらしいかんそうぶんをつくる</button>
+      <div class="shelf-list" id="shelf-list"></div>
+      <div class="shelf-empty hidden" id="shelf-empty">まだ かんそうぶんが ないよ。<br>「あたらしいかんそうぶんをつくる」から はじめよう！</div>
+    </div>
+  </section>
+
+  <!-- 本の登録画面 -->
+  <section id="screen-newbook" class="screen">
+    <header class="bar-header">
+      <button class="back-btn" data-action="back-shelf">←</button>
+      <div class="bar-title"><h2>本のとうろく</h2></div>
+      <span></span>
+    </header>
+    <div class="form-body">
+      <label class="form-label">本のタイトル</label>
+      <input type="text" id="input-title" class="form-input" placeholder="れい：スイミー" maxlength="60">
+
+      <label class="form-label">よんだ日</label>
+      <input type="date" id="input-date" class="form-input">
+
+      <label class="form-label">がくねんモード</label>
+      <div class="grade-picker">
+        <button class="grade-btn" data-grade="grade1">
+          <strong>1ねんせいモード</strong>
+          <span>ひらがな中心・4問・目標400字</span>
+        </button>
+        <button class="grade-btn" data-grade="grade3">
+          <strong>3ねんせいモード</strong>
+          <span>じっくり8問・目標800字</span>
+        </button>
+      </div>
+
+      <button class="primary-btn" id="btn-start-interview">インタビューをはじめる →</button>
+    </div>
+  </section>
+
+  <!-- インタビュー画面 -->
+  <section id="screen-interview" class="screen">
+    <header class="bar-header">
+      <button class="back-btn" data-action="interview-back">←</button>
+      <div class="bar-title"><h2>かんそうを話そう</h2></div>
+      <span class="q-progress" id="q-progress"></span>
+    </header>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="interview-progress-fill"></div>
+    </div>
+    <div class="interview-body">
+      <div class="question-card">
+        <p class="question-text" id="question-text"></p>
+      </div>
+      <textarea id="answer-input" class="answer-textarea" placeholder="ここに かいてね（またはマイクでもOK）" rows="4"></textarea>
+      <div class="mic-row">
+        <button class="mic-btn" id="btn-mic" title="音声入力（対応ブラウザのみ）">🎤 話してみる</button>
+      </div>
+      <div class="emotion-chips hidden" id="emotion-chips"></div>
+      <div class="depth-hint hidden" id="depth-hint">
+        <p>もうすこしくわしく書いてみよう！たとえば、色や音、思ったことをたしてみてね。</p>
+        <div class="depth-hint-actions">
+          <button class="ghost-btn" id="btn-depth-edit">書きなおす</button>
+          <button class="ghost-btn" id="btn-depth-continue">このまま次へ</button>
+        </div>
+      </div>
+      <button class="primary-btn" id="btn-next-question">次へ →</button>
+    </div>
+  </section>
+
+  <!-- カードパズル画面 -->
+  <section id="screen-puzzle" class="screen">
+    <header class="bar-header">
+      <button class="back-btn" data-action="back-shelf">←</button>
+      <div class="bar-title"><h2>カードをくみたてよう</h2></div>
+      <span></span>
+    </header>
+    <p class="puzzle-hint">カードをタップしてえらび → いれたい「はじめ・なか・おわり」をタップ！</p>
+    <div class="puzzle-zones">
+      <div class="puzzle-zone" data-zone="start">
+        <div class="zone-head">はじめ</div>
+        <ul class="zone-list" id="zone-start"></ul>
+      </div>
+      <div class="puzzle-zone" data-zone="mid">
+        <div class="zone-head">なか</div>
+        <ul class="zone-list" id="zone-mid"></ul>
+      </div>
+      <div class="puzzle-zone" data-zone="end">
+        <div class="zone-head">おわり</div>
+        <ul class="zone-list" id="zone-end"></ul>
+      </div>
+    </div>
+    <button class="primary-btn" id="btn-to-connect">つなぎことばへ →</button>
+  </section>
+
+  <!-- つなぎことば画面 -->
+  <section id="screen-connect" class="screen">
+    <header class="bar-header">
+      <button class="back-btn" data-action="back-puzzle">←</button>
+      <div class="bar-title"><h2>つなぎことば</h2></div>
+      <span></span>
+    </header>
+    <p class="puzzle-hint">「＋」をタップして、カードとカードのあいだに ことばを いれてみよう（いれなくてもOK）</p>
+    <div class="connect-list" id="connect-list"></div>
+    <button class="primary-btn" id="btn-to-preview">げんこうようしを見る →</button>
+  </section>
+
+  <!-- 原稿用紙プレビュー画面 -->
+  <section id="screen-preview" class="screen">
+    <header class="bar-header">
+      <button class="back-btn" data-action="back-connect">←</button>
+      <div class="bar-title"><h2>げんこうようし</h2></div>
+      <span></span>
+    </header>
+    <div class="preview-body">
+      <div class="preview-title-block">
+        <div class="preview-book-title" id="preview-book-title"></div>
+        <div class="preview-child-name" id="preview-child-name"></div>
+      </div>
+      <div class="char-meter-wrap">
+        <div class="char-meter-fill" id="char-meter-fill"></div>
+      </div>
+      <div class="char-meter-text" id="char-meter-text"></div>
+      <div class="genko-wrap">
+        <div class="genko-grid" id="genko-grid"></div>
+      </div>
+      <div class="ai-polish-row">
+        <button class="ghost-btn full" id="btn-ai-polish">✨ AIでぶんしょうをととのえる</button>
+        <p class="ai-polish-hint" id="ai-polish-hint">内容はかえずに、つなぎ方だけAIがきれいにするよ</p>
+        <button class="ghost-btn full hidden" id="btn-ai-revert">もとの文章にもどす</button>
+      </div>
+      <button class="primary-btn" id="btn-save-essay">ほぞんする ✓</button>
+      <button class="ghost-btn full" id="btn-edit-again">もどってなおす</button>
+    </div>
+  </section>
+
+  <!-- 設定画面 -->
+  <section id="screen-settings" class="screen">
+    <header class="bar-header">
+      <button class="back-btn" data-action="back-home">←</button>
+      <div class="bar-title"><h2>おうちの人の設定</h2></div>
+      <span></span>
+    </header>
+    <div class="settings-body" id="settings-body"></div>
+  </section>
+
+  <!-- パスコード入力モーダル -->
+  <div id="passcode-modal" class="modal hidden">
+    <div class="modal-inner">
+      <h3 id="passcode-title">おうちの人のパスコード</h3>
+      <div class="passcode-display" id="passcode-display">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <div class="passcode-pad">
+        <button data-key="1">1</button>
+        <button data-key="2">2</button>
+        <button data-key="3">3</button>
+        <button data-key="4">4</button>
+        <button data-key="5">5</button>
+        <button data-key="6">6</button>
+        <button data-key="7">7</button>
+        <button data-key="8">8</button>
+        <button data-key="9">9</button>
+        <button data-key="cancel">キャンセル</button>
+        <button data-key="0">0</button>
+        <button data-key="del">⌫</button>
+      </div>
+      <div class="passcode-error" id="passcode-error"></div>
+    </div>
+  </div>
+
+  <!-- つなぎことば選択モーダル -->
+  <div id="connector-modal" class="modal hidden">
+    <div class="modal-inner">
+      <h3>つなぎことばをえらぼう</h3>
+      <div class="connector-options" id="connector-options"></div>
+      <button class="ghost-btn full" id="connector-close">とじる</button>
+    </div>
+  </div>
+
+  <!-- トースト通知 -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
