@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookpiece-v3';
+const CACHE_NAME = 'bookpiece-v5';
 const ASSETS = [
   './',
   './index.html',

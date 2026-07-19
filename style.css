@@ -150,21 +150,48 @@ input, textarea { font-family: inherit; }
 }
 .form-input:focus { outline: 2px solid var(--main); }
 
-.grade-picker { display: flex; flex-direction: column; gap: 0.6rem; }
-.grade-btn {
-  text-align: left;
+.grade-num-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+.grade-num-btn {
   border: 2px solid var(--line);
   border-radius: 12px;
-  padding: 0.8rem 1rem;
+  padding: 0.7rem 0.4rem;
   background: var(--card);
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
+  font-size: 0.95rem;
+  font-weight: bold;
 }
-.grade-btn strong { font-size: 0.95rem; }
-.grade-btn span { font-size: 0.78rem; color: var(--sub); }
-.grade-btn.selected { border-color: var(--main); background: var(--main-light); }
-.grade-btn.selected strong { color: var(--main); }
+.grade-num-btn.selected {
+  border-color: var(--main);
+  background: var(--main-light);
+  color: var(--main);
+}
+.grade-hint {
+  font-size: 0.78rem;
+  color: var(--sub);
+  margin-top: 0.4rem;
+}
+.chars-presets {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.chars-preset {
+  flex: 1;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  padding: 0.45rem 0.4rem;
+  background: var(--card);
+  font-size: 0.85rem;
+}
+.chars-preset.selected {
+  border-color: var(--main);
+  background: var(--main-light);
+  color: var(--main);
+  font-weight: bold;
+}
 
 .primary-btn {
   display: block;
@@ -284,8 +311,12 @@ input, textarea { font-family: inherit; }
   border-radius: 10px;
   padding: 0.6rem 0.7rem;
   font-size: 0.88rem;
+  touch-action: none;
+  cursor: grab;
 }
 .puzzle-card.selected { background: var(--accent); color: #fff; }
+.puzzle-card .drag-handle { color: var(--sub); font-size: 0.9rem; }
+.puzzle-card.selected .drag-handle { color: rgba(255,255,255,0.7); }
 .puzzle-card .card-text { flex: 1; }
 .puzzle-card .card-move-btns { display: flex; flex-direction: column; gap: 0.15rem; }
 .puzzle-card .card-move-btns button {
@@ -297,6 +328,16 @@ input, textarea { font-family: inherit; }
   line-height: 1;
 }
 .puzzle-card.selected .card-move-btns button { background: rgba(255,255,255,0.3); color: #fff; }
+.puzzle-card.drag-origin { opacity: 0.35; }
+.puzzle-card-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  pointer-events: none;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+  opacity: 0.95;
+}
 
 /* ===== つなぎことば画面 ===== */
 .connect-list { padding: 1rem 1.2rem; max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; align-items: stretch; gap: 0; }
@@ -318,6 +359,11 @@ input, textarea { font-family: inherit; }
 }
 .connect-slot.has-word { border-style: solid; border-color: var(--accent); color: var(--accent); font-weight: bold; }
 
+.connector-group-label { font-size: 0.78rem; color: var(--sub); font-weight: bold; margin: 0.7rem 0 0.35rem; text-align: left; }
+.connector-group-label:first-child { margin-top: 0; }
+.connector-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.connector-none { display: block; width: 100%; margin-top: 1rem; border-style: dashed; color: var(--sub); }
+
 /* ===== 原稿用紙プレビュー画面 ===== */
 .preview-body { padding: 1.2rem 1rem; max-width: 700px; margin: 0 auto; }
 .preview-title-block { text-align: center; margin-bottom: 1rem; }
@@ -333,19 +379,26 @@ input, textarea { font-family: inherit; }
 .char-meter-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s; }
 .char-meter-text { font-size: 0.82rem; color: var(--sub); text-align: right; margin: 0.3rem 0 1rem; }
 
-.genko-wrap { overflow-x: auto; margin-bottom: 1.2rem; }
+.genko-wrap { overflow-x: auto; overflow-y: hidden; margin-bottom: 1.2rem; padding-bottom: 0.4rem; }
 .genko-grid {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  border-top: 2px solid #c98d8d;
-  border-left: 2px solid #c98d8d;
-  width: 100%;
-  max-width: 480px;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: flex-start;
+  width: max-content;
   margin: 0 auto;
+  border-top: 2px solid #c98d8d;
+  border-right: 2px solid #c98d8d;
+}
+.genko-col {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
 }
 .genko-grid span {
-  aspect-ratio: 1 / 1;
-  border-right: 1px solid #e3bcbc;
+  width: 1.7rem;
+  height: 1.7rem;
+  flex-shrink: 0;
+  border-left: 1px solid #e3bcbc;
   border-bottom: 1px solid #e3bcbc;
   display: flex;
   align-items: center;
@@ -359,9 +412,6 @@ input, textarea { font-family: inherit; }
 .ai-polish-row .ghost-btn:disabled { opacity: 0.5; }
 .ai-polish-hint { font-size: 0.75rem; color: var(--sub); margin: 0.4rem 0; }
 #btn-ai-revert { color: var(--sub); border-color: var(--line); margin-top: 0.4rem; }
-@media (min-width: 700px) {
-  .genko-grid { grid-template-columns: repeat(18, 1fr); max-width: 640px; }
-}
 
 /* ===== 設定画面 ===== */
 .settings-body { padding: 1.2rem 1.2rem 2rem; max-width: 560px; margin: 0 auto; }
@@ -432,7 +482,7 @@ input, textarea { font-family: inherit; }
 .passcode-pad button:active { background: var(--main); color: #fff; }
 .passcode-error { color: var(--danger); font-size: 0.82rem; margin-top: 0.8rem; min-height: 1.2rem; }
 
-.connector-options { display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: center; margin-bottom: 1rem; }
+.connector-options { margin-bottom: 1rem; }
 .connector-option {
   background: var(--main-light);
   border-radius: 999px;

@@ -66,17 +66,24 @@
       <label class="form-label">よんだ日</label>
       <input type="date" id="input-date" class="form-input">
 
-      <label class="form-label">がくねんモード</label>
-      <div class="grade-picker">
-        <button class="grade-btn" data-grade="grade1">
-          <strong>1ねんせいモード</strong>
-          <span>ひらがな中心・4問・目標400字</span>
-        </button>
-        <button class="grade-btn" data-grade="grade3">
-          <strong>3ねんせいモード</strong>
-          <span>じっくり8問・目標800字</span>
-        </button>
+      <label class="form-label">なんねんせい？</label>
+      <div class="grade-num-picker">
+        <button class="grade-num-btn" data-grade="1">1年生</button>
+        <button class="grade-num-btn" data-grade="2">2年生</button>
+        <button class="grade-num-btn" data-grade="3">3年生</button>
+        <button class="grade-num-btn" data-grade="4">4年生</button>
+        <button class="grade-num-btn" data-grade="5">5年生</button>
+        <button class="grade-num-btn" data-grade="6">6年生</button>
       </div>
+      <p class="grade-hint" id="grade-hint">学年をえらぶと、しつもんの内容がかわるよ</p>
+
+      <label class="form-label">もくひょう文字数</label>
+      <div class="chars-presets">
+        <button class="chars-preset" data-chars="400">400字</button>
+        <button class="chars-preset" data-chars="800">800字</button>
+        <button class="chars-preset" data-chars="1200">1200字</button>
+      </div>
+      <input type="number" id="input-chars" class="form-input" placeholder="れい：800" min="100" max="4000" step="50" inputmode="numeric">
 
       <button class="primary-btn" id="btn-start-interview">インタビューをはじめる →</button>
     </div>
@@ -119,7 +126,7 @@
       <div class="bar-title"><h2>カードをくみたてよう</h2></div>
       <span></span>
     </header>
-    <p class="puzzle-hint">カードをタップしてえらび → いれたい「はじめ・なか・おわり」をタップ！</p>
+    <p class="puzzle-hint">カードをドラッグして「はじめ・なか・おわり」にいれよう！（タップでもいどうできるよ）</p>
     <div class="puzzle-zones">
       <div class="puzzle-zone" data-zone="start">
         <div class="zone-head">はじめ</div>

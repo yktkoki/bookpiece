@@ -2,23 +2,36 @@
   'use strict';
 
   var STORAGE_KEY = 'bookpiece-data-v1';
-  var APP_VERSION = '1.0.0 (Phase 1)';
+  var APP_VERSION = '1.1.0';
 
   var CHILDREN = {
     shuya: { name: '修也', avatar: '🦖' },
     hiroto: { name: '啓仁', avatar: '🐰' }
   };
 
-  var CONNECTOR_WORDS = ['だから', 'でも', 'そして', 'それに', 'すると', 'なし'];
+  var CONNECTOR_GROUPS = [
+    { label: 'そのあと・じゅんばん', words: ['だから', 'そして', 'それで', 'すると', 'そのあと', 'まず', 'つぎに', 'さいごに'] },
+    { label: 'ぎゃくのいみ', words: ['でも', 'しかし', 'ところが'] },
+    { label: 'つけたす', words: ['それに', 'そのうえ', 'また'] }
+  ];
+
+  // 学年帯：low=1〜2年 / mid=3〜4年 / high=5〜6年
+  function gradeBand(gradeNum) {
+    if (gradeNum <= 2) return 'low';
+    if (gradeNum <= 4) return 'mid';
+    return 'high';
+  }
+
+  var RECOMMENDED_CHARS = { 1: 400, 2: 400, 3: 800, 4: 800, 5: 1200, 6: 1200 };
 
   var BASE_QUESTIONS = {
-    grade1: [
+    low: [
       { text: 'どんなお話だった？', zone: 'start' },
       { text: 'いちばん心にのこったのは、どこかな？', zone: 'mid' },
       { text: 'そこを読んで、どんな気持ちになった？', zone: 'mid' },
       { text: 'この本を読んで、これからやってみたいことは？', zone: 'end' }
     ],
-    grade3: [
+    mid: [
       { text: 'この本は、どんなお話ですか？', zone: 'start' },
       { text: 'どうしてこの本を選んだの？', zone: 'start' },
       { text: 'いちばん心に残った場面はどこ？', zone: 'mid' },
@@ -27,31 +40,49 @@
       { text: 'もし自分だったら、どうする？', zone: 'mid' },
       { text: 'この本を読んで、新しく気づいたことは？', zone: 'end' },
       { text: 'これから、どんなことをしてみたい？', zone: 'end' }
+    ],
+    high: [
+      { text: 'この本は、どんな内容の本？かんたんにまとめてみよう', zone: 'start' },
+      { text: 'この本を選んだ理由や、読む前に期待していたことは？', zone: 'start' },
+      { text: 'いちばん印象に残った場面はどこ？それはなぜ？', zone: 'mid' },
+      { text: 'その場面で、登場人物はどんな気持ちだったと思う？そう考えた理由もおしえて', zone: 'mid' },
+      { text: '自分の経験で、この本の内容とにていることはある？', zone: 'mid' },
+      { text: 'もし自分が同じ立場だったら、どう考えて、どう行動する？', zone: 'mid' },
+      { text: '作者がこの本で伝えたかったことは、何だと思う？', zone: 'end' },
+      { text: 'この本を読む前と後で、自分の考え方が変わったところは？', zone: 'end' },
+      { text: 'この本から学んだことを、これからの生活でどう生かしたい？', zone: 'end' }
     ]
   };
 
   // 目標文字数に届かないときに追加でたずねる質問(不足分だけ動的に出す)
   var FOLLOWUP_QUESTIONS = {
-    grade1: [
+    low: [
       { text: 'ほかに心にのこったところはある？', zone: 'mid' },
       { text: 'その時、どんな音がきこえた気がする？', zone: 'mid' },
       { text: 'もし自分がその話に出てきたら、なにをしたい？', zone: 'mid' },
       { text: 'いちばん好きな絵や場面はどこ？', zone: 'mid' },
       { text: 'この本を、だれにすすめたい？どうして？', zone: 'end' }
     ],
-    grade3: [
+    mid: [
       { text: 'ほかに印象に残った場面はある？', zone: 'mid' },
       { text: '登場人物の中で、いちばん好きなのはだれ？どうして？', zone: 'mid' },
       { text: 'もし続きの物語があるなら、どうなってほしい？', zone: 'mid' },
       { text: '作者は、この本を通してどんなことを伝えたかったと思う？', zone: 'end' },
       { text: 'この本を読む前と後で、自分の考えは変わった？', zone: 'end' },
       { text: '同じ作者やにたテーマの本も読んでみたい？なぜ？', zone: 'end' }
+    ],
+    high: [
+      { text: 'ほかに印象に残った場面やせりふ、言葉はある？', zone: 'mid' },
+      { text: 'いちばん共感できた登場人物はだれ？どんなところに共感した？', zone: 'mid' },
+      { text: 'ぎゃくに、なっとくできなかったところや、ぎもんに思ったところはある？', zone: 'mid' },
+      { text: 'この本のテーマを、ニュースや身のまわりの出来事と結びつけて考えられることはある？', zone: 'mid' },
+      { text: 'もし続きや別の結末があるとしたら、どんな物語を想像する？', zone: 'mid' },
+      { text: 'この本をだれにすすめたい？その理由もくわしくおしえて', zone: 'end' }
     ]
   };
 
   var EMOTION_CHIPS = ['うれしい', 'びっくり', 'かなしい', 'たのしい', 'こわい', 'ふしぎ', 'どきどき', 'ほっとした'];
-
-  var GRADE_TARGET_CHARS = { grade1: 400, grade3: 800 };
+  var GENKO_ROWS_PER_COLUMN = 20;
   var DEPTH_MIN_LENGTH = 8;
   // このくらい集まっていれば十分とみなし、追加質問を打ち切る目安(目標の85%)
   var ENOUGH_RATIO = 0.85;
@@ -86,6 +117,11 @@
     selectedCardId: null,
     connectorSlotIndex: null
   };
+
+  // ドラッグ＆ドロップ（カードパズル画面）
+  var dragCtx = { pointerId: null, cardId: null, originLi: null, dragging: false, ghost: null, offsetX: 0, offsetY: 0, width: 0 };
+  var DRAG_THRESHOLD = 8;
+  var suppressNextCardClick = false;
 
   // ---------- DOM helpers ----------
   function $(id) { return document.getElementById(id); }
@@ -124,23 +160,24 @@
   // ---------- データモデル ----------
   function defaultData() {
     return {
-      version: 2,
+      version: 3,
       passcode: '0000',
       geminiApiKey: '',
       books: []
     };
   }
 
-  function defaultBook(childId, title, date, grade) {
+  function defaultBook(childId, title, date, gradeNum, targetChars) {
     return {
       id: uid(),
       childId: childId,
       title: title,
       date: date,
-      grade: grade,
+      gradeNum: gradeNum,
+      targetChars: targetChars,
       stage: 'interview',
       answers: [],
-      questionQueue: BASE_QUESTIONS[grade].map(cloneQuestion),
+      questionQueue: BASE_QUESTIONS[gradeBand(gradeNum)].map(cloneQuestion),
       followupIndex: 0,
       cards: [],
       zones: { start: [], mid: [], end: [] },
@@ -160,12 +197,19 @@
     if (typeof raw.geminiApiKey !== 'string') raw.geminiApiKey = '';
     if (!raw.books) raw.books = [];
     raw.books.forEach(function (book) {
-      if (!book.questionQueue) book.questionQueue = (BASE_QUESTIONS[book.grade] || BASE_QUESTIONS.grade1).map(cloneQuestion);
+      // 旧データ('grade1'/'grade3'モード)を学年数値＋目標文字数へ変換
+      if (typeof book.gradeNum !== 'number') {
+        book.gradeNum = (book.grade === 'grade3') ? 3 : 1;
+      }
+      if (typeof book.targetChars !== 'number') {
+        book.targetChars = RECOMMENDED_CHARS[book.gradeNum] || 400;
+      }
+      if (!book.questionQueue) book.questionQueue = BASE_QUESTIONS[gradeBand(book.gradeNum)].map(cloneQuestion);
       if (typeof book.followupIndex !== 'number') book.followupIndex = 0;
       if (typeof book.rawEssayText !== 'string') book.rawEssayText = '';
       if (typeof book.aiPolished !== 'boolean') book.aiPolished = false;
     });
-    raw.version = 2;
+    raw.version = 3;
     return raw;
   }
 
@@ -228,7 +272,7 @@
     books.forEach(function (book) {
       var item = document.createElement('div');
       item.className = 'shelf-item';
-      var gradeLabel = book.grade === 'grade1' ? '1ねんせい' : '3ねんせい';
+      var gradeLabel = book.gradeNum + 'ねんせい・' + book.targetChars + '字';
       var statusLabel = book.status === 'done' ? 'できた！' : 'とちゅう';
       var statusClass = book.status === 'done' ? 'done' : 'draft';
       item.innerHTML =
@@ -293,32 +337,55 @@
   }
 
   // ---------- 本の登録 ----------
-  var selectedGrade = null;
+  var selectedGradeNum = null;
 
   function initNewBook() {
     qs('[data-action="new-book"]').addEventListener('click', function () {
       $('input-title').value = '';
       $('input-date').value = new Date().toISOString().slice(0, 10);
-      selectedGrade = null;
-      qsa('.grade-btn').forEach(function (b) { b.classList.remove('selected'); });
+      $('input-chars').value = '';
+      selectedGradeNum = null;
+      qsa('.grade-num-btn').forEach(function (b) { b.classList.remove('selected'); });
+      qsa('.chars-preset').forEach(function (b) { b.classList.remove('selected'); });
       showScreen('screen-newbook');
     });
 
-    qsa('.grade-btn').forEach(function (btn) {
+    qsa('.grade-num-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        selectedGrade = btn.getAttribute('data-grade');
-        qsa('.grade-btn').forEach(function (b) { b.classList.remove('selected'); });
+        selectedGradeNum = parseInt(btn.getAttribute('data-grade'), 10);
+        qsa('.grade-num-btn').forEach(function (b) { b.classList.remove('selected'); });
         btn.classList.add('selected');
+        // 学年に合わせたおすすめ文字数を自動入力(あとから自由に変更OK)
+        $('input-chars').value = RECOMMENDED_CHARS[selectedGradeNum];
+        qsa('.chars-preset').forEach(function (b) {
+          b.classList.toggle('selected', parseInt(b.getAttribute('data-chars'), 10) === RECOMMENDED_CHARS[selectedGradeNum]);
+        });
+      });
+    });
+
+    qsa('.chars-preset').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        $('input-chars').value = btn.getAttribute('data-chars');
+        qsa('.chars-preset').forEach(function (b) { b.classList.toggle('selected', b === btn); });
+      });
+    });
+
+    $('input-chars').addEventListener('input', function () {
+      var val = parseInt($('input-chars').value, 10);
+      qsa('.chars-preset').forEach(function (b) {
+        b.classList.toggle('selected', parseInt(b.getAttribute('data-chars'), 10) === val);
       });
     });
 
     $('btn-start-interview').addEventListener('click', function () {
       var title = $('input-title').value.trim();
       var date = $('input-date').value;
+      var chars = parseInt($('input-chars').value, 10);
       if (!title) { toast('本のタイトルを入れてね'); return; }
-      if (!selectedGrade) { toast('がくねんモードをえらんでね'); return; }
+      if (!selectedGradeNum) { toast('なんねんせいか えらんでね'); return; }
+      if (!chars || chars < 100 || chars > 4000) { toast('もくひょう文字数は100〜4000字で入れてね'); return; }
 
-      var book = defaultBook(state.childId, title, date, selectedGrade);
+      var book = defaultBook(state.childId, title, date, selectedGradeNum, chars);
       data.books.push(book);
       saveData();
       state.bookId = book.id;
@@ -406,7 +473,7 @@
     var q = questions[idx];
 
     var totalChars = book.answers.reduce(function (sum, a) { return sum + (a ? a.text.length : 0); }, 0);
-    var target = GRADE_TARGET_CHARS[book.grade];
+    var target = book.targetChars;
     $('q-progress').textContent = totalChars + '字 / ' + target + '字';
     $('interview-progress-fill').style.width = Math.min(100, Math.round((totalChars / target) * 100)) + '%';
     $('question-text').textContent = q.text;
@@ -414,7 +481,7 @@
     $('depth-hint').classList.add('hidden');
 
     var chipsWrap = $('emotion-chips');
-    if (book.grade === 'grade1') {
+    if (book.gradeNum <= 2) {
       chipsWrap.classList.remove('hidden');
       chipsWrap.innerHTML = EMOTION_CHIPS.map(function (w) {
         return '<button type="button" class="emotion-chip">' + w + '</button>';
@@ -454,9 +521,9 @@
     book.updatedAt = Date.now();
 
     var totalChars = book.answers.reduce(function (sum, a) { return sum + (a ? a.text.length : 0); }, 0);
-    var target = GRADE_TARGET_CHARS[book.grade];
+    var target = book.targetChars;
     var needMore = totalChars < target * ENOUGH_RATIO;
-    var pool = FOLLOWUP_QUESTIONS[book.grade];
+    var pool = FOLLOWUP_QUESTIONS[gradeBand(book.gradeNum)];
 
     if (idx + 1 >= questions.length && needMore && book.followupIndex < pool.length) {
       questions.push(cloneQuestion(pool[book.followupIndex]));
@@ -505,6 +572,118 @@
       renderConnect();
       showScreen('screen-connect');
     });
+    qs('.puzzle-zones').addEventListener('pointerdown', onPuzzlePointerDown);
+  }
+
+  // ---------- カードのドラッグ＆ドロップ ----------
+  function onPuzzlePointerDown(ev) {
+    if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+    var li = ev.target.closest('.puzzle-card');
+    if (!li) return;
+    if (ev.target.closest('.card-move-btns')) return;
+
+    dragCtx.pointerId = ev.pointerId;
+    dragCtx.cardId = li.getAttribute('data-card');
+    dragCtx.originLi = li;
+    dragCtx.startX = ev.clientX;
+    dragCtx.startY = ev.clientY;
+    dragCtx.dragging = false;
+
+    var rect = li.getBoundingClientRect();
+    dragCtx.offsetX = ev.clientX - rect.left;
+    dragCtx.offsetY = ev.clientY - rect.top;
+    dragCtx.width = rect.width;
+
+    try { li.setPointerCapture(ev.pointerId); } catch (e) { /* noop */ }
+    li.addEventListener('pointermove', onPuzzlePointerMove);
+    li.addEventListener('pointerup', onPuzzlePointerUp);
+    li.addEventListener('pointercancel', onPuzzlePointerUp);
+  }
+
+  function onPuzzlePointerMove(ev) {
+    if (ev.pointerId !== dragCtx.pointerId) return;
+    var dx = ev.clientX - dragCtx.startX;
+    var dy = ev.clientY - dragCtx.startY;
+    if (!dragCtx.dragging) {
+      if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+      startPuzzleDrag();
+    }
+    ev.preventDefault();
+    movePuzzleGhost(ev.clientX, ev.clientY);
+    updatePuzzleDropHighlight(ev.clientX, ev.clientY);
+  }
+
+  function startPuzzleDrag() {
+    dragCtx.dragging = true;
+    dragCtx.originLi.classList.add('drag-origin');
+    var ghost = dragCtx.originLi.cloneNode(true);
+    ghost.classList.add('puzzle-card-ghost');
+    ghost.style.width = dragCtx.width + 'px';
+    document.body.appendChild(ghost);
+    dragCtx.ghost = ghost;
+  }
+
+  function movePuzzleGhost(x, y) {
+    if (!dragCtx.ghost) return;
+    dragCtx.ghost.style.transform = 'translate(' + (x - dragCtx.offsetX) + 'px, ' + (y - dragCtx.offsetY) + 'px)';
+  }
+
+  function updatePuzzleDropHighlight(x, y) {
+    var el = document.elementFromPoint(x, y);
+    var zoneEl = el && el.closest('.puzzle-zone');
+    qsa('.puzzle-zone').forEach(function (z) { z.classList.toggle('drop-target', z === zoneEl); });
+  }
+
+  function onPuzzlePointerUp(ev) {
+    if (ev.pointerId !== dragCtx.pointerId) return;
+    var li = dragCtx.originLi;
+    li.removeEventListener('pointermove', onPuzzlePointerMove);
+    li.removeEventListener('pointerup', onPuzzlePointerUp);
+    li.removeEventListener('pointercancel', onPuzzlePointerUp);
+    try { li.releasePointerCapture(ev.pointerId); } catch (e) { /* noop */ }
+
+    if (dragCtx.dragging) {
+      finishPuzzleDrop(ev.clientX, ev.clientY);
+      suppressNextCardClick = true;
+    }
+    if (dragCtx.ghost) { dragCtx.ghost.remove(); dragCtx.ghost = null; }
+    li.classList.remove('drag-origin');
+    qsa('.puzzle-zone').forEach(function (z) { z.classList.remove('drop-target'); });
+    dragCtx.dragging = false;
+    dragCtx.cardId = null;
+    dragCtx.pointerId = null;
+    dragCtx.originLi = null;
+  }
+
+  function finishPuzzleDrop(x, y) {
+    var el = document.elementFromPoint(x, y);
+    var zoneEl = el && el.closest('.puzzle-zone');
+    if (!zoneEl) return;
+    var targetZone = zoneEl.getAttribute('data-zone');
+    var listEl = qs('.zone-list', zoneEl);
+    var cards = qsa('.puzzle-card', listEl).filter(function (c) { return c.getAttribute('data-card') !== dragCtx.cardId; });
+    var targetIndex = cards.length;
+    for (var i = 0; i < cards.length; i++) {
+      var r = cards[i].getBoundingClientRect();
+      var mid = r.top + r.height / 2;
+      if (y < mid) { targetIndex = i; break; }
+    }
+    moveCardToZoneAtIndex(dragCtx.cardId, targetZone, targetIndex);
+  }
+
+  function moveCardToZoneAtIndex(cardId, targetZone, targetIndex) {
+    var book = currentBook();
+    var fromZone = findCardZone(book, cardId);
+    if (fromZone) {
+      book.zones[fromZone] = book.zones[fromZone].filter(function (id) { return id !== cardId; });
+    }
+    var arr = book.zones[targetZone];
+    var idx = Math.max(0, Math.min(targetIndex, arr.length));
+    arr.splice(idx, 0, cardId);
+    state.selectedCardId = null;
+    book.updatedAt = Date.now();
+    saveData();
+    renderPuzzle();
   }
 
   function cardById(book, cardId) {
@@ -524,15 +703,7 @@
 
   function moveCardToZone(cardId, targetZone) {
     var book = currentBook();
-    var fromZone = findCardZone(book, cardId);
-    if (fromZone) {
-      book.zones[fromZone] = book.zones[fromZone].filter(function (id) { return id !== cardId; });
-    }
-    book.zones[targetZone].push(cardId);
-    state.selectedCardId = null;
-    book.updatedAt = Date.now();
-    saveData();
-    renderPuzzle();
+    moveCardToZoneAtIndex(cardId, targetZone, book.zones[targetZone].length);
   }
 
   function renderPuzzle() {
@@ -547,6 +718,7 @@
         li.className = 'puzzle-card' + (state.selectedCardId === cardId ? ' selected' : '');
         li.setAttribute('data-card', cardId);
         li.innerHTML =
+          '<span class="drag-handle">⠿</span>' +
           '<span class="card-text">' + escapeHtml(card.text) + '</span>' +
           '<span class="card-move-btns">' +
             '<button type="button" data-up="' + cardId + '">▲</button>' +
@@ -555,6 +727,7 @@
         listEl.appendChild(li);
 
         li.addEventListener('click', function (ev) {
+          if (suppressNextCardClick) { suppressNextCardClick = false; return; }
           if (ev.target.closest('.card-move-btns')) return;
           ev.stopPropagation();
           state.selectedCardId = (state.selectedCardId === cardId) ? null : cardId;
@@ -641,9 +814,16 @@
   function openConnectorModal(slotIndex) {
     state.connectorSlotIndex = slotIndex;
     var optWrap = $('connector-options');
-    optWrap.innerHTML = CONNECTOR_WORDS.map(function (w) {
-      return '<button type="button" class="connector-option" data-word="' + w + '">' + w + '</button>';
+    var html = CONNECTOR_GROUPS.map(function (group) {
+      return '<div class="connector-group-label">' + escapeHtml(group.label) + '</div>' +
+        '<div class="connector-group">' +
+        group.words.map(function (w) {
+          return '<button type="button" class="connector-option" data-word="' + w + '">' + w + '</button>';
+        }).join('') +
+        '</div>';
     }).join('');
+    html += '<button type="button" class="connector-option connector-none" data-word="なし">❌ つかわない</button>';
+    optWrap.innerHTML = html;
     qsa('.connector-option', optWrap).forEach(function (btn) {
       btn.addEventListener('click', function () {
         var word = btn.getAttribute('data-word');
@@ -678,7 +858,7 @@
   function renderPreview() {
     var book = currentBook();
     var child = CHILDREN[book.childId];
-    var target = GRADE_TARGET_CHARS[book.grade];
+    var target = book.targetChars;
     var text = book.essayText || buildEssayText(book);
 
     $('preview-book-title').textContent = '「' + book.title + '」を読んで';
@@ -692,10 +872,17 @@
     var grid = $('genko-grid');
     grid.innerHTML = '';
     var cellCount = Math.max(target, chars.length);
-    for (var i = 0; i < cellCount; i++) {
-      var span = document.createElement('span');
-      span.textContent = chars[i] || '';
-      grid.appendChild(span);
+    var colCount = Math.ceil(cellCount / GENKO_ROWS_PER_COLUMN);
+    for (var c = 0; c < colCount; c++) {
+      var col = document.createElement('div');
+      col.className = 'genko-col';
+      for (var r = 0; r < GENKO_ROWS_PER_COLUMN; r++) {
+        var i = c * GENKO_ROWS_PER_COLUMN + r;
+        var span = document.createElement('span');
+        span.textContent = chars[i] || '';
+        col.appendChild(span);
+      }
+      grid.appendChild(col);
     }
 
     var polishBtn = $('btn-ai-polish');
