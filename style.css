@@ -232,6 +232,23 @@ input, textarea { font-family: inherit; }
 }
 .question-text { font-size: 1.15rem; font-weight: bold; color: var(--main-dark); line-height: 1.7; }
 
+/* ===== ふりがな（学年1〜2年のときだけ表示） ===== */
+rt { font-size: 0.45em; color: var(--sub); font-weight: normal; }
+body:not(.furigana-on) rt { display: none; }
+.furigana-on .question-text { line-height: 2.1; }
+
+.speak-btn {
+  margin-top: 0.7rem;
+  background: var(--card);
+  color: var(--main);
+  font-weight: bold;
+  font-size: 0.85rem;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  border: 2px solid var(--main);
+}
+.speak-btn.speaking { background: var(--main); color: #fff; }
+
 .answer-textarea {
   width: 100%;
   border: 1px solid var(--line);
@@ -406,6 +423,11 @@ input, textarea { font-family: inherit; }
   font-size: 0.85rem;
   color: var(--ink);
 }
+.genko-grid span.hang {
+  flex-direction: column;
+  font-size: 0.68rem;
+  line-height: 1.1;
+}
 
 .ai-polish-row { text-align: center; margin-bottom: 1rem; }
 .ai-polish-row .ghost-btn { border-color: var(--accent-light); color: var(--accent); }
@@ -427,6 +449,63 @@ input, textarea { font-family: inherit; }
 .settings-input-row label { font-size: 0.85rem; min-width: 5.5rem; color: var(--sub); }
 .settings-input-row input { flex: 1; min-width: 6rem; border: 1px solid var(--line); border-radius: 8px; padding: 0.5rem 0.7rem; }
 .settings-save { background: var(--main); color: #fff; border-radius: 8px; padding: 0.5rem 1rem; font-size: 0.85rem; }
+.settings-save.full { display: block; width: 100%; text-align: center; padding: 0.7rem; margin-top: 0.8rem; }
+
+.settings-children-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.child-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--main-light);
+  border-radius: 10px;
+  padding: 0.5rem 0.6rem;
+}
+.child-row-avatar {
+  font-size: 1.5rem;
+  background: var(--card);
+  border-radius: 50%;
+  width: 2.6rem;
+  height: 2.6rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.child-row-name {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.95rem;
+  background: var(--card);
+}
+.child-row-delete {
+  color: var(--danger);
+  font-size: 0.8rem;
+  font-weight: bold;
+  padding: 0.4rem 0.6rem;
+  flex-shrink: 0;
+}
+.settings-add-child { margin-top: 0.9rem; }
+.avatar-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+.avatar-choice-btn {
+  font-size: 1.3rem;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  width: 2.4rem;
+  height: 2.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.avatar-choice-btn.selected { border-color: var(--main); background: var(--main-light); }
 .settings-export-text {
   width: 100%;
   min-height: 8rem;
@@ -492,6 +571,64 @@ input, textarea { font-family: inherit; }
   color: var(--main-dark);
 }
 .connector-option:active { background: var(--main); color: #fff; }
+
+/* ===== 確認モーダル ===== */
+.confirm-emoji { font-size: 2.4rem; margin-bottom: 0.6rem; }
+.confirm-message { font-size: 0.95rem; line-height: 1.7; margin-bottom: 1.2rem; white-space: pre-line; }
+.confirm-actions { display: flex; gap: 0.7rem; }
+.confirm-actions .ghost-btn { flex: 1; }
+.confirm-ok-btn {
+  flex: 1;
+  background: var(--danger);
+  color: #fff;
+  font-weight: bold;
+  font-size: 0.95rem;
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+}
+.confirm-ok-btn:active { transform: scale(0.97); }
+
+/* ===== 完成お祝い ===== */
+.celebrate-inner h3 { font-size: 1.4rem; color: var(--main); margin-bottom: 0.6rem; }
+.celebrate-emoji { font-size: 3rem; animation: celebrate-pop 0.5s ease; }
+.celebrate-message { font-size: 0.95rem; line-height: 1.8; white-space: pre-line; margin-bottom: 0.4rem; }
+@keyframes celebrate-pop {
+  0% { transform: scale(0); }
+  70% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+.confetti-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 300;
+}
+.confetti-piece {
+  position: absolute;
+  top: -5%;
+  width: 10px;
+  height: 14px;
+  border-radius: 2px;
+  animation: confetti-fall linear forwards;
+}
+@keyframes confetti-fall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(540deg); opacity: 0.7; }
+}
+
+/* ===== 本棚のごほうび ===== */
+.shelf-reward {
+  background: var(--card);
+  border-radius: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  padding: 0.7rem 1rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+.reward-stars { display: block; font-size: 1.05rem; letter-spacing: 0.1em; }
+.reward-text { display: block; font-size: 0.8rem; color: var(--sub); margin-top: 0.2rem; }
 
 /* ===== トースト ===== */
 .toast {

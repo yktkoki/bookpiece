@@ -2,12 +2,17 @@
   'use strict';
 
   var STORAGE_KEY = 'bookpiece-data-v1';
-  var APP_VERSION = '1.1.0';
+  var APP_VERSION = '1.3.0';
 
-  var CHILDREN = {
-    shuya: { name: '修也', avatar: '🦖' },
-    hiroto: { name: '啓仁', avatar: '🐰' }
-  };
+  var AVATAR_CHOICES = ['🦖', '🐰', '🐱', '🐶', '🦊', '🐼', '🐸', '🦁', '🐯', '🐨', '🦄', '🐥', '🐻', '🐵'];
+  var newChildSelectedAvatar = null;
+
+  function getChild(childId) {
+    for (var i = 0; i < data.children.length; i++) {
+      if (data.children[i].id === childId) return data.children[i];
+    }
+    return null;
+  }
 
   var CONNECTOR_GROUPS = [
     { label: 'そのあと・じゅんばん', words: ['だから', 'そして', 'それで', 'すると', 'そのあと', 'まず', 'つぎに', 'さいごに'] },
@@ -24,12 +29,13 @@
 
   var RECOMMENDED_CHARS = { 1: 400, 2: 400, 3: 800, 4: 800, 5: 1200, 6: 1200 };
 
+  // 《》はふりがな記法：漢字《かんじ》 → <ruby>漢字<rt>かんじ</rt></ruby>
   var BASE_QUESTIONS = {
     low: [
-      { text: 'どんなお話だった？', zone: 'start' },
-      { text: 'いちばん心にのこったのは、どこかな？', zone: 'mid' },
-      { text: 'そこを読んで、どんな気持ちになった？', zone: 'mid' },
-      { text: 'この本を読んで、これからやってみたいことは？', zone: 'end' }
+      { text: 'どんなお話《はなし》だった？', zone: 'start' },
+      { text: 'いちばん心《こころ》にのこったのは、どこかな？', zone: 'mid' },
+      { text: 'そこを読《よ》んで、どんな気持《きも》ちになった？', zone: 'mid' },
+      { text: 'この本《ほん》を読《よ》んで、これからやってみたいことは？', zone: 'end' }
     ],
     mid: [
       { text: 'この本は、どんなお話ですか？', zone: 'start' },
@@ -57,11 +63,11 @@
   // 目標文字数に届かないときに追加でたずねる質問(不足分だけ動的に出す)
   var FOLLOWUP_QUESTIONS = {
     low: [
-      { text: 'ほかに心にのこったところはある？', zone: 'mid' },
-      { text: 'その時、どんな音がきこえた気がする？', zone: 'mid' },
-      { text: 'もし自分がその話に出てきたら、なにをしたい？', zone: 'mid' },
-      { text: 'いちばん好きな絵や場面はどこ？', zone: 'mid' },
-      { text: 'この本を、だれにすすめたい？どうして？', zone: 'end' }
+      { text: 'ほかに心《こころ》にのこったところはある？', zone: 'mid' },
+      { text: 'その時《とき》、どんな音《おと》がきこえた気《き》がする？', zone: 'mid' },
+      { text: 'もし自分《じぶん》がその話《はなし》に出《で》てきたら、なにをしたい？', zone: 'mid' },
+      { text: 'いちばん好《す》きな絵《え》や場面《ばめん》はどこ？', zone: 'mid' },
+      { text: 'この本《ほん》を、だれにすすめたい？どうして？', zone: 'end' }
     ],
     mid: [
       { text: 'ほかに印象に残った場面はある？', zone: 'mid' },
@@ -105,7 +111,7 @@
     var btn = $('btn-mic');
     if (btn) {
       btn.classList.remove('listening');
-      btn.textContent = '🎤 話してみる';
+      btn.innerHTML = rubyToHtml('🎤 話《はな》してみる');
     }
   }
 
@@ -130,9 +136,11 @@
 
   function showScreen(id) {
     stopListening();
+    stopSpeaking();
     qsa('.screen').forEach(function (el) { el.classList.remove('active'); });
     $(id).classList.add('active');
     window.scrollTo(0, 0);
+    if (id === 'screen-home') renderChildPicker();
   }
 
   var toastTimer = null;
@@ -157,12 +165,89 @@
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   }
 
+  // ---------- ふりがな（《》記法） ----------
+  var RUBY_PATTERN = /([㐀-鿿々〆ヶ]+)《([^》]+)》/g;
+
+  function stripRuby(str) {
+    return String(str).replace(/《[^》]+》/g, '');
+  }
+
+  function rubyToHtml(str) {
+    return escapeHtml(str).replace(RUBY_PATTERN, '<ruby>$1<rt>$2</rt></ruby>');
+  }
+
+  // ---------- 確認モーダル（confirmの代わり） ----------
+  var confirmCallback = null;
+
+  function showConfirm(message, opts, onOk) {
+    opts = opts || {};
+    $('confirm-emoji').textContent = opts.emoji || '🤔';
+    $('confirm-message').textContent = message;
+    $('confirm-ok').textContent = opts.okLabel || 'はい';
+    confirmCallback = onOk;
+    $('confirm-modal').classList.remove('hidden');
+  }
+
+  function setupConfirmModal() {
+    $('confirm-cancel').addEventListener('click', function () {
+      confirmCallback = null;
+      $('confirm-modal').classList.add('hidden');
+    });
+    $('confirm-ok').addEventListener('click', function () {
+      var cb = confirmCallback;
+      confirmCallback = null;
+      $('confirm-modal').classList.add('hidden');
+      if (cb) cb();
+    });
+  }
+
+  // ---------- お祝い演出 ----------
+  var CONFETTI_COLORS = ['#e76f51', '#2c6e49', '#f4a261', '#e9c46a', '#4c956c', '#8ecae6'];
+
+  function launchConfetti() {
+    var layer = document.createElement('div');
+    layer.className = 'confetti-layer';
+    for (var i = 0; i < 40; i++) {
+      var piece = document.createElement('span');
+      piece.className = 'confetti-piece';
+      piece.style.left = (Math.random() * 100) + '%';
+      piece.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+      piece.style.animationDelay = (Math.random() * 0.8) + 's';
+      piece.style.animationDuration = (1.8 + Math.random() * 1.2) + 's';
+      layer.appendChild(piece);
+    }
+    document.body.appendChild(layer);
+    setTimeout(function () { layer.remove(); }, 3500);
+  }
+
+  function celebrateSave(book) {
+    var doneCount = data.books.filter(function (b) {
+      return b.childId === book.childId && b.status === 'done';
+    }).length;
+    var msg = 'これで ' + doneCount + 'さつめの かんそうぶんが できたよ！';
+    if (doneCount === 1) msg = 'はじめての かんそうぶんが できたよ！';
+    if (doneCount === 3) msg += '\n🥉 3さつ たっせい！すごい！';
+    if (doneCount === 5) msg += '\n🥈 5さつ たっせい！めいじんだね！';
+    if (doneCount >= 10) msg += '\n🥇 10さつ いじょう！はかせだ！';
+    $('celebrate-message').textContent = msg;
+    $('celebrate-modal').classList.remove('hidden');
+    launchConfetti();
+  }
+
+  function setupCelebrateModal() {
+    $('celebrate-close').addEventListener('click', function () {
+      $('celebrate-modal').classList.add('hidden');
+      openShelf();
+    });
+  }
+
   // ---------- データモデル ----------
   function defaultData() {
     return {
-      version: 3,
+      version: 4,
       passcode: '0000',
       geminiApiKey: '',
+      children: [],
       books: []
     };
   }
@@ -196,6 +281,13 @@
     if (!raw.passcode) raw.passcode = '0000';
     if (typeof raw.geminiApiKey !== 'string') raw.geminiApiKey = '';
     if (!raw.books) raw.books = [];
+    // 旧バージョン(子ども固定モード)からの移行：既存データのchildIdをそのまま活かす
+    if (!raw.children) {
+      raw.children = [
+        { id: 'shuya', name: '修也', avatar: '🦖' },
+        { id: 'hiroto', name: '啓仁', avatar: '🐰' }
+      ];
+    }
     raw.books.forEach(function (book) {
       // 旧データ('grade1'/'grade3'モード)を学年数値＋目標文字数へ変換
       if (typeof book.gradeNum !== 'number') {
@@ -209,7 +301,7 @@
       if (typeof book.rawEssayText !== 'string') book.rawEssayText = '';
       if (typeof book.aiPolished !== 'boolean') book.aiPolished = false;
     });
-    raw.version = 3;
+    raw.version = 4;
     return raw;
   }
 
@@ -237,13 +329,36 @@
   function currentBook() { return getBook(state.bookId); }
 
   // ---------- ホーム画面 ----------
-  function initHome() {
-    qsa('.child-btn').forEach(function (btn) {
+  function renderChildPicker() {
+    var wrap = $('child-picker');
+    wrap.innerHTML = '';
+    $('child-picker-empty').classList.toggle('hidden', data.children.length > 0);
+
+    data.children.forEach(function (child) {
+      var btn = document.createElement('button');
+      btn.className = 'child-btn';
+      btn.setAttribute('data-child', child.id);
+
+      var avatarSpan = document.createElement('span');
+      avatarSpan.className = 'avatar';
+      avatarSpan.textContent = child.avatar;
+
+      var nameSpan = document.createElement('span');
+      nameSpan.className = 'child-name';
+      nameSpan.textContent = child.name;
+
+      btn.appendChild(avatarSpan);
+      btn.appendChild(nameSpan);
       btn.addEventListener('click', function () {
-        state.childId = btn.getAttribute('data-child');
+        state.childId = child.id;
         openShelf();
       });
+      wrap.appendChild(btn);
     });
+  }
+
+  function initHome() {
+    renderChildPicker();
     qs('[data-action="open-settings"]').addEventListener('click', function () {
       requestPasscode('おうちの人の設定', function () {
         renderSettings();
@@ -254,8 +369,8 @@
 
   // ---------- 本棚 ----------
   function openShelf() {
-    var child = CHILDREN[state.childId];
-    $('shelf-avatar').innerHTML = '<span>' + child.avatar + '</span>';
+    var child = getChild(state.childId);
+    $('shelf-avatar').textContent = child.avatar;
     $('shelf-title').textContent = child.name + 'の本だな';
     renderShelf();
     showScreen('screen-shelf');
@@ -297,14 +412,32 @@
       el.addEventListener('click', function (ev) {
         ev.stopPropagation();
         var id = el.getAttribute('data-delete');
-        if (confirm('このかんそうぶんを削除しますか？')) {
+        showConfirm('このかんそうぶんを けしてもいい？', { emoji: '🗑️', okLabel: 'けす' }, function () {
           data.books = data.books.filter(function (b) { return b.id !== id; });
           saveData();
           renderShelf();
           toast('削除しました');
-        }
+        });
       });
     });
+
+    renderShelfReward(books);
+  }
+
+  // 完成した冊数に応じてほめる（ごほうび表示）
+  function renderShelfReward(books) {
+    var doneCount = books.filter(function (b) { return b.status === 'done'; }).length;
+    var el = $('shelf-reward');
+    el.classList.toggle('hidden', doneCount === 0);
+    if (doneCount === 0) return;
+    var stars = '';
+    for (var i = 0; i < Math.min(doneCount, 10); i++) stars += '⭐';
+    var medal = '';
+    if (doneCount >= 10) medal = '🥇';
+    else if (doneCount >= 5) medal = '🥈';
+    else if (doneCount >= 3) medal = '🥉';
+    el.innerHTML = '<span class="reward-stars">' + stars + '</span>' +
+      '<span class="reward-text">できた かんそうぶん：' + doneCount + 'さつ ' + medal + '</span>';
   }
 
   function openBook(bookId) {
@@ -398,6 +531,7 @@
   // ---------- インタビュー画面 ----------
   function initInterview() {
     $('btn-next-question').addEventListener('click', onNextQuestion);
+    $('btn-speak').addEventListener('click', onSpeakQuestion);
     $('btn-depth-continue').addEventListener('click', function () {
       $('depth-hint').classList.add('hidden');
       commitAnswer();
@@ -407,6 +541,35 @@
       $('answer-input').focus();
     });
     $('btn-mic').addEventListener('click', onMicClick);
+  }
+
+  // ---------- 質問の読み上げ ----------
+  function stopSpeaking() {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    var btn = $('btn-speak');
+    if (btn) btn.classList.remove('speaking');
+  }
+
+  function onSpeakQuestion() {
+    if (!('speechSynthesis' in window)) {
+      toast('このブラウザでは よみあげが つかえないよ🔊');
+      return;
+    }
+    if (window.speechSynthesis.speaking) {
+      stopSpeaking();
+      return;
+    }
+    var book = currentBook();
+    var q = book.questionQueue[state.questionIndex];
+    if (!q) return;
+    var utter = new SpeechSynthesisUtterance(stripRuby(q.text));
+    utter.lang = 'ja-JP';
+    utter.rate = 0.9;
+    var btn = $('btn-speak');
+    utter.onstart = function () { btn.classList.add('speaking'); };
+    utter.onend = function () { btn.classList.remove('speaking'); };
+    utter.onerror = function () { btn.classList.remove('speaking'); };
+    window.speechSynthesis.speak(utter);
   }
 
   function onMicClick() {
@@ -434,6 +597,7 @@
       btn.classList.add('listening');
       btn.textContent = '🎤 きいているよ…（タップでとめる）';
     };
+
 
     recognition.onresult = function (ev) {
       var finalText = '';
@@ -476,7 +640,8 @@
     var target = book.targetChars;
     $('q-progress').textContent = totalChars + '字 / ' + target + '字';
     $('interview-progress-fill').style.width = Math.min(100, Math.round((totalChars / target) * 100)) + '%';
-    $('question-text').textContent = q.text;
+    document.body.classList.toggle('furigana-on', book.gradeNum <= 2);
+    $('question-text').innerHTML = rubyToHtml(q.text);
     $('answer-input').value = '';
     $('depth-hint').classList.add('hidden');
 
@@ -517,7 +682,7 @@
     var q = questions[idx];
     var text = $('answer-input').value.trim();
 
-    book.answers[idx] = { text: text, zone: q.zone, question: q.text };
+    book.answers[idx] = { text: text, zone: q.zone, question: stripRuby(q.text) };
     book.updatedAt = Date.now();
 
     var totalChars = book.answers.reduce(function (sum, a) { return sum + (a ? a.text.length : 0); }, 0);
@@ -838,48 +1003,81 @@
   }
 
   // ---------- 原稿用紙プレビュー ----------
+  // はじめ・なか・おわりを段落として組み立てる。改行(\n)が段落の切れ目で、
+  // 段落の頭には1マス分の全角スペースを入れる
   function buildEssayText(book) {
     var order = flattenZones(book);
-    var text = '　';
+    var text = '';
+    var prevZone = null;
     order.forEach(function (cardId, i) {
       var card = cardById(book, cardId);
       if (!card) return;
-      var sentence = card.text;
-      if (!/[。！？]$/.test(sentence)) sentence += '。';
-      text += sentence;
-      if (i < order.length - 1) {
-        var word = book.connectors[i];
-        if (word) text += word + '、';
+      var sentence = String(card.text).replace(/[\r\n]+/g, '').trim();
+      if (!sentence) return;
+      if (!/[。！？」]$/.test(sentence)) sentence += '。';
+      var connector = i > 0 ? (book.connectors[i - 1] || '') : '';
+      // 答えがすでに同じつなぎ言葉で始まっていたら二重にしない
+      if (connector && sentence.indexOf(connector) === 0) connector = '';
+      var zone = findCardZone(book, cardId);
+      if (prevZone === null || zone !== prevZone) {
+        text += (prevZone === null ? '' : '\n') + '　';
       }
+      if (connector) text += connector + '、';
+      text += sentence;
+      prevZone = zone;
     });
     return text;
   }
 
+  // 原稿用紙の行割り。句読点・閉じかっこは行頭に来ないよう前の行の最後のマスにぶら下げる
+  function layoutGenko(text) {
+    var lines = [[]];
+    var chars = Array.from(text);
+    for (var i = 0; i < chars.length; i++) {
+      var ch = chars[i];
+      if (ch === '\n') { lines.push([]); continue; }
+      var line = lines[lines.length - 1];
+      if (line.length >= GENKO_ROWS_PER_COLUMN) {
+        if (ch === '、' || ch === '。' || ch === '」') {
+          line[GENKO_ROWS_PER_COLUMN - 1] += ch;
+          continue;
+        }
+        lines.push([]);
+        line = lines[lines.length - 1];
+      }
+      line.push(ch);
+    }
+    return lines;
+  }
+
   function renderPreview() {
     var book = currentBook();
-    var child = CHILDREN[book.childId];
+    var child = getChild(book.childId);
     var target = book.targetChars;
     var text = book.essayText || buildEssayText(book);
 
     $('preview-book-title').textContent = '「' + book.title + '」を読んで';
     $('preview-child-name').textContent = child.name;
 
-    var chars = Array.from(text);
-    var pct = Math.min(100, Math.round((chars.length / target) * 100));
+    var charCount = Array.from(text.replace(/\n/g, '')).length;
+    var pct = Math.min(100, Math.round((charCount / target) * 100));
     $('char-meter-fill').style.width = pct + '%';
-    $('char-meter-text').textContent = chars.length + ' / ' + target + '字';
+    $('char-meter-text').textContent = charCount + ' / ' + target + '字';
 
     var grid = $('genko-grid');
     grid.innerHTML = '';
-    var cellCount = Math.max(target, chars.length);
-    var colCount = Math.ceil(cellCount / GENKO_ROWS_PER_COLUMN);
+    var lines = layoutGenko(text);
+    var colCount = Math.max(lines.length, Math.ceil(target / GENKO_ROWS_PER_COLUMN));
     for (var c = 0; c < colCount; c++) {
       var col = document.createElement('div');
       col.className = 'genko-col';
+      var line = lines[c] || [];
       for (var r = 0; r < GENKO_ROWS_PER_COLUMN; r++) {
-        var i = c * GENKO_ROWS_PER_COLUMN + r;
         var span = document.createElement('span');
-        span.textContent = chars[i] || '';
+        var cell = line[r] || '';
+        span.textContent = cell;
+        // ぶら下げた句読点入りのマス（2文字）は縦に小さく並べる
+        if (Array.from(cell).length > 1) span.className = 'hang';
         col.appendChild(span);
       }
       grid.appendChild(col);
@@ -908,20 +1106,21 @@
   function initPreview() {
     $('btn-save-essay').addEventListener('click', function () {
       var book = currentBook();
-      book.essayText = buildEssayText(book);
+      if (!book.aiPolished) book.essayText = buildEssayText(book);
       book.status = 'done';
       book.stage = 'done';
       book.updatedAt = Date.now();
       saveData();
-      toast('ほぞんしました！');
-      openShelf();
+      celebrateSave(book);
     });
     $('btn-edit-again').addEventListener('click', function () {
       var book = currentBook();
       book.stage = 'connect';
+      book.status = 'draft';
       book.essayText = '';
       book.rawEssayText = '';
       book.aiPolished = false;
+      book.updatedAt = Date.now();
       saveData();
       renderConnect();
       showScreen('screen-connect');
@@ -950,13 +1149,14 @@
       '以下は小学生が自分の言葉で書いた読書感想文です。内容や事実、言いたいことは絶対に変えず、' +
       '一文一文の言葉もできるだけそのまま活かしてください。文と文のつなぎ方や助詞、句読点だけを、' +
       '小学生らしい自然な日本語になるように少しだけ整えてください。新しい内容やエピソードを付け加えないでください。' +
+      '段落の分かれ目（改行）と、段落のはじめの全角スペースはそのまま残してください。' +
       '整えた文章のみを出力してください。\n\n---\n' + original;
 
-    var endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + encodeURIComponent(data.geminiApiKey);
+    var endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
     fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': data.geminiApiKey },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
     })
       .then(function (res) {
@@ -1065,6 +1265,17 @@
     var body = $('settings-body');
     body.innerHTML =
       '<div class="settings-group">' +
+        '<h3>お子さんの登録</h3>' +
+        '<div class="settings-children-list" id="settings-children-list"></div>' +
+        '<div class="settings-add-child">' +
+          '<label class="form-label" style="margin-top:0.8rem;">なまえ</label>' +
+          '<input type="text" id="new-child-name" class="form-input" placeholder="れい：ゆうた" maxlength="20">' +
+          '<label class="form-label">アイコン</label>' +
+          '<div class="avatar-picker" id="new-child-avatar-picker"></div>' +
+          '<button class="settings-save full" id="btn-add-child">お子さんを追加</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="settings-group">' +
         '<h3>パスコードの変更</h3>' +
         '<div class="settings-input-row">' +
           '<label>新パスコード</label>' +
@@ -1097,6 +1308,98 @@
     $('export-text').value = JSON.stringify(data, null, 2);
     $('gemini-api-key').value = data.geminiApiKey || '';
 
+    function renderChildrenBlock() {
+      var listEl = $('settings-children-list');
+      listEl.innerHTML = '';
+      data.children.forEach(function (child) {
+        var row = document.createElement('div');
+        row.className = 'child-settings-row';
+
+        var avatarBtn = document.createElement('button');
+        avatarBtn.type = 'button';
+        avatarBtn.className = 'child-row-avatar';
+        avatarBtn.title = 'タップでアイコンをかえる';
+        avatarBtn.textContent = child.avatar;
+        avatarBtn.addEventListener('click', function () {
+          var idx = AVATAR_CHOICES.indexOf(child.avatar);
+          child.avatar = AVATAR_CHOICES[(idx + 1) % AVATAR_CHOICES.length];
+          saveData();
+          renderChildrenBlock();
+        });
+
+        var nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'child-row-name';
+        nameInput.maxLength = 20;
+        nameInput.value = child.name;
+        nameInput.addEventListener('change', function () {
+          var v = nameInput.value.trim();
+          if (!v) { nameInput.value = child.name; return; }
+          child.name = v;
+          saveData();
+          toast('名前を変更しました');
+        });
+
+        var delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'child-row-delete';
+        delBtn.textContent = '削除';
+        delBtn.addEventListener('click', function () {
+          var bookCount = data.books.filter(function (b) { return b.childId === child.id; }).length;
+          var msg = bookCount > 0
+            ? child.name + 'さんを削除しますか？かんそうぶん' + bookCount + '件もいっしょに削除されます。この操作は元に戻せません。'
+            : child.name + 'さんを削除しますか？この操作は元に戻せません。';
+          showConfirm(msg, { emoji: '⚠️', okLabel: '削除する' }, function () {
+            data.children = data.children.filter(function (c) { return c.id !== child.id; });
+            data.books = data.books.filter(function (b) { return b.childId !== child.id; });
+            saveData();
+            renderChildrenBlock();
+            toast('削除しました');
+          });
+        });
+
+        row.appendChild(avatarBtn);
+        row.appendChild(nameInput);
+        row.appendChild(delBtn);
+        listEl.appendChild(row);
+      });
+    }
+
+    function renderNewChildAvatarPicker() {
+      var picker = $('new-child-avatar-picker');
+      picker.innerHTML = '';
+      if (!newChildSelectedAvatar) newChildSelectedAvatar = AVATAR_CHOICES[0];
+      AVATAR_CHOICES.forEach(function (a) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'avatar-choice-btn' + (a === newChildSelectedAvatar ? ' selected' : '');
+        btn.textContent = a;
+        btn.addEventListener('click', function () {
+          newChildSelectedAvatar = a;
+          renderNewChildAvatarPicker();
+        });
+        picker.appendChild(btn);
+      });
+    }
+
+    renderChildrenBlock();
+    renderNewChildAvatarPicker();
+
+    $('btn-add-child').addEventListener('click', function () {
+      var nameInput = $('new-child-name');
+      var name = nameInput.value.trim();
+      if (!name) { toast('なまえを入力してね'); return; }
+      var avatar = newChildSelectedAvatar || AVATAR_CHOICES[0];
+      var id = 'child-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+      data.children.push({ id: id, name: name, avatar: avatar });
+      saveData();
+      nameInput.value = '';
+      newChildSelectedAvatar = null;
+      renderChildrenBlock();
+      renderNewChildAvatarPicker();
+      toast(name + 'さんを追加しました');
+    });
+
     $('btn-save-apikey').addEventListener('click', function () {
       data.geminiApiKey = $('gemini-api-key').value.trim();
       saveData();
@@ -1113,13 +1416,13 @@
     });
 
     $('btn-reset-data').addEventListener('click', function () {
-      if (confirm('本当にすべてのデータを消しますか？この操作は元に戻せません。')) {
+      showConfirm('本当にすべてのデータを消しますか？この操作は元に戻せません。', { emoji: '⚠️', okLabel: '消す' }, function () {
         localStorage.removeItem(STORAGE_KEY);
         data = defaultData();
         saveData();
         toast('データをリセットしました');
         showScreen('screen-home');
-      }
+      });
     });
   }
 
@@ -1143,6 +1446,8 @@
     initPreview();
     initNav();
     setupPasscodePad();
+    setupConfirmModal();
+    setupCelebrateModal();
     registerSW();
   }
 

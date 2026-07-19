@@ -22,16 +22,10 @@
       <h1>ブックピース</h1>
       <p class="home-sub">よんだかんそうを、パズルみたいにくみたてよう</p>
     </header>
-    <div class="child-picker">
-      <button class="child-btn" data-child="shuya">
-        <span class="avatar">🦖</span>
-        <span class="child-name" data-name="shuya">修也</span>
-      </button>
-      <button class="child-btn" data-child="hiroto">
-        <span class="avatar">🐰</span>
-        <span class="child-name" data-name="hiroto">啓仁</span>
-      </button>
-    </div>
+    <div class="child-picker" id="child-picker"></div>
+    <p class="child-picker-empty hidden" id="child-picker-empty">
+      まだお子さんが登録されていません。<br>「⚙️ おうちの人の設定」から追加してね。
+    </p>
     <button class="settings-link" data-action="open-settings">⚙️ おうちの人の設定</button>
   </section>
 
@@ -46,6 +40,7 @@
       <span></span>
     </header>
     <div class="shelf-body">
+      <div class="shelf-reward hidden" id="shelf-reward"></div>
       <button class="new-book-btn" data-action="new-book">＋ あたらしいかんそうぶんをつくる</button>
       <div class="shelf-list" id="shelf-list"></div>
       <div class="shelf-empty hidden" id="shelf-empty">まだ かんそうぶんが ないよ。<br>「あたらしいかんそうぶんをつくる」から はじめよう！</div>
@@ -93,7 +88,7 @@
   <section id="screen-interview" class="screen">
     <header class="bar-header">
       <button class="back-btn" data-action="interview-back">←</button>
-      <div class="bar-title"><h2>かんそうを話そう</h2></div>
+      <div class="bar-title"><h2>かんそうを<ruby>話<rt>はな</rt></ruby>そう</h2></div>
       <span class="q-progress" id="q-progress"></span>
     </header>
     <div class="progress-bar-wrap">
@@ -102,20 +97,21 @@
     <div class="interview-body">
       <div class="question-card">
         <p class="question-text" id="question-text"></p>
+        <button class="speak-btn" id="btn-speak" title="しつもんをよみあげる">🔊 よんでもらう</button>
       </div>
       <textarea id="answer-input" class="answer-textarea" placeholder="ここに かいてね（またはマイクでもOK）" rows="4"></textarea>
       <div class="mic-row">
-        <button class="mic-btn" id="btn-mic" title="音声入力（対応ブラウザのみ）">🎤 話してみる</button>
+        <button class="mic-btn" id="btn-mic" title="音声入力（対応ブラウザのみ）">🎤 <ruby>話<rt>はな</rt></ruby>してみる</button>
       </div>
       <div class="emotion-chips hidden" id="emotion-chips"></div>
       <div class="depth-hint hidden" id="depth-hint">
-        <p>もうすこしくわしく書いてみよう！たとえば、色や音、思ったことをたしてみてね。</p>
+        <p>もうすこしくわしく<ruby>書<rt>か</rt></ruby>いてみよう！たとえば、<ruby>色<rt>いろ</rt></ruby>や<ruby>音<rt>おと</rt></ruby>、<ruby>思<rt>おも</rt></ruby>ったことをたしてみてね。</p>
         <div class="depth-hint-actions">
-          <button class="ghost-btn" id="btn-depth-edit">書きなおす</button>
-          <button class="ghost-btn" id="btn-depth-continue">このまま次へ</button>
+          <button class="ghost-btn" id="btn-depth-edit"><ruby>書<rt>か</rt></ruby>きなおす</button>
+          <button class="ghost-btn" id="btn-depth-continue">このまま<ruby>次<rt>つぎ</rt></ruby>へ</button>
         </div>
       </div>
-      <button class="primary-btn" id="btn-next-question">次へ →</button>
+      <button class="primary-btn" id="btn-next-question"><ruby>次<rt>つぎ</rt></ruby>へ →</button>
     </div>
   </section>
 
@@ -153,7 +149,7 @@
     </header>
     <p class="puzzle-hint">「＋」をタップして、カードとカードのあいだに ことばを いれてみよう（いれなくてもOK）</p>
     <div class="connect-list" id="connect-list"></div>
-    <button class="primary-btn" id="btn-to-preview">げんこうようしを見る →</button>
+    <button class="primary-btn" id="btn-to-preview">げんこうようしを<ruby>見<rt>み</rt></ruby>る →</button>
   </section>
 
   <!-- 原稿用紙プレビュー画面 -->
@@ -226,6 +222,28 @@
       <h3>つなぎことばをえらぼう</h3>
       <div class="connector-options" id="connector-options"></div>
       <button class="ghost-btn full" id="connector-close">とじる</button>
+    </div>
+  </div>
+
+  <!-- 確認モーダル（confirmの代わり） -->
+  <div id="confirm-modal" class="modal hidden">
+    <div class="modal-inner">
+      <div class="confirm-emoji" id="confirm-emoji">🤔</div>
+      <p class="confirm-message" id="confirm-message"></p>
+      <div class="confirm-actions">
+        <button class="ghost-btn" id="confirm-cancel">やめる</button>
+        <button class="confirm-ok-btn" id="confirm-ok">はい</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 完成お祝いモーダル -->
+  <div id="celebrate-modal" class="modal hidden">
+    <div class="modal-inner celebrate-inner">
+      <div class="celebrate-emoji">🎉</div>
+      <h3>かんせい！</h3>
+      <p class="celebrate-message" id="celebrate-message"></p>
+      <button class="primary-btn" id="celebrate-close">本だなへ →</button>
     </div>
   </div>
 
