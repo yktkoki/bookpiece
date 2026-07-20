@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookpiece-v7';
+const CACHE_NAME = 'bookpiece-v8';
 const ASSETS = [
   './',
   './index.html',
@@ -24,17 +24,37 @@ self.addEventListener('activate', (e) => {
   self.clients.claim();
 });
 
+// コード（HTML/JS/CSS）はネットワーク優先。
+// キャッシュ優先にすると修正をデプロイしても端末が古いコードを使い続けるため。
+// オフライン時はキャッシュにフォールバックするので PWA として動く。
+const NETWORK_FIRST = /\.(html|js|css)$/;
+
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
+  if (e.request.method !== 'GET') return;
+
+  const isCode =
+    e.request.mode === 'navigate' ||
+    url.pathname.endsWith('/') ||
+    NETWORK_FIRST.test(url.pathname);
+
   e.respondWith(
-    caches.match(e.request).then((cached) => {
-      const fetchPromise = fetch(e.request).then((res) => {
-        const clone = res.clone();
-        caches.open(CACHE_NAME).then((c) => c.put(e.request, clone)).catch(() => {});
-        return res;
-      }).catch(() => cached);
-      return cached || fetchPromise;
-    })
+    isCode
+      ? fetch(e.request)
+          .then((res) => {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(e.request, clone)).catch(() => {});
+            return res;
+          })
+          .catch(() => caches.match(e.request))
+      : caches.match(e.request).then((cached) => {
+          const fetchPromise = fetch(e.request).then((res) => {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(e.request, clone)).catch(() => {});
+            return res;
+          }).catch(() => cached);
+          return cached || fetchPromise;
+        })
   );
 });

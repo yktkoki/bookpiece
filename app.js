@@ -1140,8 +1140,12 @@
     var status = err && err.status;
     if (status === 429) return 'AIの利用上限（無料枠）に達しました。時間をおくか、APIキーの設定を見直してね';
     if (status === 400 || status === 401 || status === 403) return 'APIキーが正しくないようです。せっていで確認してね';
+    if (status === 404) return 'AIのモデルが見つかりませんでした。アプリを再よみこみしてね';
     if (status) return 'AIとのつうしんに失敗しました（エラー' + status + '）。もういちど試してね';
-    return 'AIとのつうしんに失敗しました。もういちど試してね';
+    if (err && err.message === 'empty response') {
+      return 'AIがぶんしょうを返してくれませんでした（' + (err.finishReason || '理由ふめい') + '）。もういちど試してね';
+    }
+    return 'AIとのつうしんに失敗しました。つうしんかんきょうをかくにんしてね';
   }
 
   function onAiPolish() {
@@ -1179,14 +1183,20 @@
         return res.json();
       })
       .then(function (json) {
-        var polished = json.candidates &&
-          json.candidates[0] &&
-          json.candidates[0].content &&
-          json.candidates[0].content.parts &&
-          json.candidates[0].content.parts[0] &&
-          json.candidates[0].content.parts[0].text;
-        polished = (polished || '').trim();
-        if (!polished) throw new Error('empty response');
+        // 思考パートが混ざることがあるので、テキストを持つパートを全部つなぐ
+        var cand = json.candidates && json.candidates[0];
+        var parts = (cand && cand.content && cand.content.parts) || [];
+        var polished = parts
+          .filter(function (p) { return p && typeof p.text === 'string' && !p.thought; })
+          .map(function (p) { return p.text; })
+          .join('')
+          .trim();
+        if (!polished) {
+          var err = new Error('empty response');
+          err.finishReason = (cand && cand.finishReason) ||
+            (json.promptFeedback && json.promptFeedback.blockReason);
+          throw err;
+        }
 
         book.rawEssayText = original;
         book.essayText = polished;
