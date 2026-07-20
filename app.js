@@ -142,8 +142,11 @@
     questionIndex: 0,
     passcodeCallback: null,
     selectedCardId: null,
-    connectorSlotIndex: null
+    connectorSlotIndex: null,
+    lastDrop: null // { cardId, ok } 直前に置いたカードの演出用。描画したら消す
   };
+
+  var ZONE_LABEL = { start: 'はじめ', mid: 'なか', end: 'おわり' };
 
   // ドラッグ＆ドロップ（カードパズル画面）
   var dragCtx = { pointerId: null, cardId: null, originLi: null, dragging: false, ghost: null, offsetX: 0, offsetY: 0, width: 0 };
@@ -265,7 +268,7 @@
   // ---------- データモデル ----------
   function defaultData() {
     return {
-      version: 4,
+      version: 5,
       passcode: '0000',
       geminiApiKey: '',
       children: [],
@@ -286,7 +289,7 @@
       questionQueue: BASE_QUESTIONS[gradeBand(gradeNum)].map(cloneQuestion),
       followupIndex: 0,
       cards: [],
-      zones: { start: [], mid: [], end: [] },
+      zones: { pool: [], start: [], mid: [], end: [] },
       connectors: {},
       essayText: '',
       rawEssayText: '',
@@ -321,8 +324,19 @@
       if (typeof book.followupIndex !== 'number') book.followupIndex = 0;
       if (typeof book.rawEssayText !== 'string') book.rawEssayText = '';
       if (typeof book.aiPolished !== 'boolean') book.aiPolished = false;
+      // v5: カードに正解ゾーンを持たせ、手札置き場(pool)を追加。
+      // 既存の本はすでに振り分け済みなので pool は空のまま＝そのまま続きから使える。
+      if (book.zones && !book.zones.pool) book.zones.pool = [];
+      if (book.cards) {
+        book.cards.forEach(function (card, i) {
+          if (!card.zone) {
+            var ans = book.answers && book.answers[i];
+            card.zone = (ans && ans.zone) || 'mid';
+          }
+        });
+      }
     });
-    raw.version = 4;
+    raw.version = 5;
     return raw;
   }
 
@@ -734,14 +748,22 @@
     }
   }
 
+  function shuffled(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  // カードは「まだ入れてない置き場(pool)」から始める。
+  // zone には設計上の正解を持たせ、置いたときのフィードバックに使う。
   function buildCardsFromAnswers(book) {
     book.cards = book.answers.map(function (ans, i) {
-      return { id: 'c' + i, text: ans.text };
+      return { id: 'c' + i, text: ans.text, zone: ans.zone };
     });
-    book.zones = { start: [], mid: [], end: [] };
-    book.answers.forEach(function (ans, i) {
-      book.zones[ans.zone].push('c' + i);
-    });
+    book.zones = { pool: shuffled(book.cards.map(function (c) { return c.id; })), start: [], mid: [], end: [] };
   }
 
   // ---------- カードパズル画面 ----------
@@ -762,7 +784,16 @@
       renderConnect();
       showScreen('screen-connect');
     });
-    qs('.puzzle-zones').addEventListener('pointerdown', onPuzzlePointerDown);
+    // 置き場のカードもドラッグできるよう、画面全体で受ける
+    $('screen-puzzle').addEventListener('pointerdown', onPuzzlePointerDown);
+
+    $('btn-auto-place').addEventListener('click', function () {
+      var book = currentBook();
+      book.zones.pool.slice().forEach(function (cardId) {
+        var card = cardById(book, cardId);
+        moveCardToZoneAtIndex(cardId, (card && card.zone) || 'mid', Infinity, true);
+      });
+    });
   }
 
   // ---------- カードのドラッグ＆ドロップ ----------
@@ -861,7 +892,7 @@
     moveCardToZoneAtIndex(dragCtx.cardId, targetZone, targetIndex);
   }
 
-  function moveCardToZoneAtIndex(cardId, targetZone, targetIndex) {
+  function moveCardToZoneAtIndex(cardId, targetZone, targetIndex, silent) {
     var book = currentBook();
     var fromZone = findCardZone(book, cardId);
     if (fromZone) {
@@ -870,6 +901,21 @@
     var arr = book.zones[targetZone];
     var idx = Math.max(0, Math.min(targetIndex, arr.length));
     arr.splice(idx, 0, cardId);
+
+    // フィードバックは「置き場から初めて入れたとき」だけ。
+    // あとから並べ替えるたびに口を出さないようにする。
+    if (!silent && fromZone === 'pool' && targetZone !== 'pool') {
+      var card = cardById(book, cardId);
+      var ok = !!card && card.zone === targetZone;
+      state.lastDrop = { cardId: cardId, ok: ok };
+      if (ok) {
+        playDing();
+      } else if (card) {
+        // 感想文に唯一の正解はないので、直させずに提案だけする
+        toast('そこでもいいけど「' + ZONE_LABEL[card.zone] + '」のほうが読みやすいかも');
+      }
+    }
+
     state.selectedCardId = null;
     book.updatedAt = Date.now();
     saveData();
@@ -898,22 +944,29 @@
 
   function renderPuzzle() {
     var book = currentBook();
-    ['start', 'mid', 'end'].forEach(function (zone) {
+    ['pool', 'start', 'mid', 'end'].forEach(function (zone) {
       var listEl = $('zone-' + zone);
       listEl.innerHTML = '';
       book.zones[zone].forEach(function (cardId, i) {
         var card = cardById(book, cardId);
         if (!card) return;
         var li = document.createElement('li');
-        li.className = 'puzzle-card' + (state.selectedCardId === cardId ? ' selected' : '');
+        var cls = 'puzzle-card';
+        if (state.selectedCardId === cardId) cls += ' selected';
+        if (state.lastDrop && state.lastDrop.cardId === cardId) {
+          cls += state.lastDrop.ok ? ' just-right' : ' just-wrong';
+        }
+        li.className = cls;
         li.setAttribute('data-card', cardId);
         li.innerHTML =
           '<span class="drag-handle">⠿</span>' +
           '<span class="card-text">' + escapeHtml(card.text) + '</span>' +
-          '<span class="card-move-btns">' +
-            '<button type="button" data-up="' + cardId + '">▲</button>' +
-            '<button type="button" data-down="' + cardId + '">▼</button>' +
-          '</span>';
+          // 置き場では並び順に意味がないので上下ボタンは出さない
+          (zone === 'pool' ? '' :
+            '<span class="card-move-btns">' +
+              '<button type="button" data-up="' + cardId + '">▲</button>' +
+              '<button type="button" data-down="' + cardId + '">▼</button>' +
+            '</span>');
         listEl.appendChild(li);
 
         li.addEventListener('click', function (ev) {
@@ -925,6 +978,18 @@
         });
       });
     });
+
+    renderPuzzleProgress(book);
+
+    // 演出クラスは一度きり。次の描画に持ち越さないよう、ここで消す
+    if (state.lastDrop) {
+      var dropped = state.lastDrop;
+      state.lastDrop = null;
+      setTimeout(function () {
+        var el = qs('[data-card="' + dropped.cardId + '"]');
+        if (el) el.classList.remove('just-right', 'just-wrong');
+      }, 800);
+    }
 
     qsa('[data-up]').forEach(function (btn) {
       btn.addEventListener('click', function (ev) {
@@ -938,6 +1003,47 @@
         reorderCard(btn.getAttribute('data-down'), 1);
       });
     });
+  }
+
+  // 残り枚数の表示と、「つなぎことばへ」のロック
+  function renderPuzzleProgress(book) {
+    var left = book.zones.pool.length;
+    $('pool-count').textContent = left > 0 ? 'のこり ' + left + 'まい' : '';
+    $('pool-done').classList.toggle('hidden', left > 0);
+    $('puzzle-pool').classList.toggle('is-empty', left === 0);
+    $('btn-auto-place').classList.toggle('hidden', left === 0);
+
+    var next = $('btn-to-connect');
+    next.disabled = left > 0;
+    next.textContent = left > 0 ? 'あと ' + left + 'まい！' : 'つなぎことばへ →';
+  }
+
+  var audioCtx = null;
+
+  // 正しい箱に入ったときの「ピコン」。音が出せない環境では黙って何もしない
+  function playDing() {
+    try {
+      if (!audioCtx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        audioCtx = new AC();
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      [880, 1320].forEach(function (freq, i) {
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        var t = audioCtx.currentTime + i * 0.09;
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(0.16, t + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.2);
+      });
+    } catch (e) { /* 音は出せなくても操作には影響しない */ }
   }
 
   function reorderCard(cardId, delta) {

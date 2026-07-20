@@ -346,6 +346,36 @@ body:not(.furigana-on) rt { display: none; }
 }
 .puzzle-card.selected .card-move-btns button { background: rgba(255,255,255,0.3); color: #fff; }
 .puzzle-card.drag-origin { opacity: 0.35; }
+
+/* 手札置き場：ここが空になったらクリア */
+.puzzle-pool {
+  max-width: 700px;
+  margin: 0.8rem auto 0;
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+.puzzle-pool.is-empty { border-style: dashed; border-color: var(--line); background: var(--card); }
+.pool-head { display: flex; justify-content: space-between; align-items: baseline; }
+.pool-count { font-size: 0.8rem; color: var(--accent); font-weight: bold; }
+.pool-done { text-align: center; color: var(--main); font-weight: bold; font-size: 0.9rem; padding: 0.4rem 0; }
+
+/* 置いた瞬間のフィードバック。正解はぴょこん、それ以外はふるふる */
+.puzzle-card.just-right { animation: card-pop 0.45s ease; background: var(--main); color: #fff; }
+.puzzle-card.just-wrong { animation: card-wobble 0.4s ease; }
+@keyframes card-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+@keyframes card-wobble {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .puzzle-card.just-right, .puzzle-card.just-wrong { animation: none; }
+}
 .puzzle-card-ghost {
   position: fixed;
   top: 0;

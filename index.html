@@ -124,6 +124,17 @@
       <span></span>
     </header>
     <p class="puzzle-hint">カードをドラッグして「はじめ・なか・おわり」にいれよう！（タップでもいどうできるよ）</p>
+
+    <!-- 手札置き場：ここからカードを3つの箱へ振り分ける -->
+    <div class="puzzle-pool puzzle-zone" data-zone="pool" id="puzzle-pool">
+      <div class="zone-head pool-head">
+        <span>まだ入れてないカード</span>
+        <span class="pool-count" id="pool-count"></span>
+      </div>
+      <ul class="zone-list" id="zone-pool"></ul>
+      <p class="pool-done hidden" id="pool-done">ぜんぶ入れられたね！🎉</p>
+    </div>
+
     <div class="puzzle-zones">
       <div class="puzzle-zone" data-zone="start">
         <div class="zone-head">はじめ</div>
@@ -138,6 +149,7 @@
         <ul class="zone-list" id="zone-end"></ul>
       </div>
     </div>
+    <button class="ghost-btn full" id="btn-auto-place">おまかせでいれる</button>
     <button class="primary-btn" id="btn-to-connect">つなぎことばへ →</button>
   </section>
 
