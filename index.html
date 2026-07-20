@@ -18,16 +18,27 @@
   <!-- ホーム画面：子供選択 -->
   <section id="screen-home" class="screen active">
     <header class="home-header">
-      <div class="home-logo">📖🧩</div>
+      <img class="home-logo" src="./icons/icon.svg" width="72" height="72" alt="">
       <h1>ブックピース</h1>
       <p class="home-sub">よんだかんそうを、パズルみたいにくみたてよう</p>
     </header>
-    <div class="child-picker" id="child-picker"></div>
-    <p class="child-picker-empty hidden" id="child-picker-empty">
-      まだお子さんが登録されていません。<br>「⚙️ おうちの人の設定」から追加してね。
-    </p>
-    <button class="settings-link" data-action="open-settings">⚙️ おうちの人の設定</button>
-    <button class="settings-link" data-action="open-guide">📘 つかいかた</button>
+    <div class="home-body">
+      <h2 class="home-section-title">だれの本だな？</h2>
+      <div class="child-picker" id="child-picker"></div>
+      <p class="child-picker-empty hidden" id="child-picker-empty">
+        まだお子さんが登録されていません。<br>「⚙️ おうちの人の設定」から追加してね。
+      </p>
+      <div class="home-actions">
+        <button class="home-action" data-action="open-settings">
+          <span class="home-action-icon">⚙️</span>
+          <span class="home-action-label">おうちの人の設定</span>
+        </button>
+        <button class="home-action" data-action="open-guide">
+          <span class="home-action-icon">📘</span>
+          <span class="home-action-label">つかいかた</span>
+        </button>
+      </div>
+    </div>
   </section>
 
   <!-- 本棚画面 -->

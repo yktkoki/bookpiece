@@ -364,26 +364,67 @@
   function currentBook() { return getBook(state.bookId); }
 
   // ---------- ホーム画面 ----------
+  // 完成冊数から「つぎのメダルまであと何冊か」を出す（本棚のごほうび表示と同じ基準）
+  var MEDAL_STEPS = [
+    { count: 3, medal: '🥉' },
+    { count: 5, medal: '🥈' },
+    { count: 10, medal: '🥇' }
+  ];
+
+  function medalProgress(doneCount) {
+    var earned = '';
+    for (var i = 0; i < MEDAL_STEPS.length; i++) {
+      if (doneCount >= MEDAL_STEPS[i].count) earned = MEDAL_STEPS[i].medal;
+      else return {
+        medal: earned,
+        next: MEDAL_STEPS[i],
+        // つぎのメダルまでの進みぐあい。冊数が増えたら必ずバーも伸びるようにする
+        // （直前のメダルからの相対値にすると、メダル獲得の瞬間に0%へ戻ってしまう）
+        ratio: doneCount / MEDAL_STEPS[i].count
+      };
+    }
+    return { medal: earned, next: null, ratio: 1 };
+  }
+
   function renderChildPicker() {
     var wrap = $('child-picker');
     wrap.innerHTML = '';
     $('child-picker-empty').classList.toggle('hidden', data.children.length > 0);
 
     data.children.forEach(function (child) {
+      var books = data.books.filter(function (b) { return b.childId === child.id; });
+      var doneCount = books.filter(function (b) { return b.status === 'done'; }).length;
+      var prog = medalProgress(doneCount);
+
+      var latest = null;
+      books.forEach(function (b) {
+        if (!latest || b.updatedAt > latest.updatedAt) latest = b;
+      });
+
       var btn = document.createElement('button');
       btn.className = 'child-btn';
       btn.setAttribute('data-child', child.id);
 
-      var avatarSpan = document.createElement('span');
-      avatarSpan.className = 'avatar';
-      avatarSpan.textContent = child.avatar;
+      var goalText = prog.next
+        ? 'あと' + (prog.next.count - doneCount) + 'さつで ' + prog.next.medal
+        : 'はかせ たっせい！';
 
-      var nameSpan = document.createElement('span');
-      nameSpan.className = 'child-name';
-      nameSpan.textContent = child.name;
+      btn.innerHTML =
+        '<span class="child-avatar">' + escapeHtml(child.avatar) +
+          (prog.medal ? '<span class="child-medal">' + prog.medal + '</span>' : '') +
+        '</span>' +
+        '<span class="child-name">' + escapeHtml(child.name) + '</span>' +
+        '<span class="child-count">' +
+          '<b>' + doneCount + '</b>さつ かんせい' +
+          (books.length > doneCount ? '<span class="child-draft">とちゅう ' + (books.length - doneCount) + '</span>' : '') +
+        '</span>' +
+        '<span class="child-meter"><span class="child-meter-fill" style="width:' +
+          Math.round(prog.ratio * 100) + '%"></span></span>' +
+        '<span class="child-goal">' + goalText + '</span>' +
+        '<span class="child-latest">' +
+          (latest ? '📖 ' + escapeHtml(latest.title || '（タイトルなし）') : 'さいしょの1さつを よもう！') +
+        '</span>';
 
-      btn.appendChild(avatarSpan);
-      btn.appendChild(nameSpan);
       btn.addEventListener('click', function () {
         state.childId = child.id;
         openShelf();
