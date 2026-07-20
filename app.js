@@ -1136,6 +1136,14 @@
     });
   }
 
+  function aiErrorMessage(err) {
+    var status = err && err.status;
+    if (status === 429) return 'AIの利用上限（無料枠）に達しました。時間をおくか、APIキーの設定を見直してね';
+    if (status === 400 || status === 401 || status === 403) return 'APIキーが正しくないようです。せっていで確認してね';
+    if (status) return 'AIとのつうしんに失敗しました（エラー' + status + '）。もういちど試してね';
+    return 'AIとのつうしんに失敗しました。もういちど試してね';
+  }
+
   function onAiPolish() {
     var book = currentBook();
     if (!data.geminiApiKey) { toast('せっていでAPIキーを入力してね'); return; }
@@ -1152,7 +1160,7 @@
       '段落の分かれ目（改行）と、段落のはじめの全角スペースはそのまま残してください。' +
       '整えた文章のみを出力してください。\n\n---\n' + original;
 
-    var endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+    var endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent';
 
     fetch(endpoint, {
       method: 'POST',
@@ -1160,7 +1168,14 @@
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
     })
       .then(function (res) {
-        if (!res.ok) throw new Error('API error ' + res.status);
+        if (!res.ok) {
+          return res.json().catch(function () { return null; }).then(function (errJson) {
+            var err = new Error('API error ' + res.status);
+            err.status = res.status;
+            err.apiMessage = errJson && errJson.error && errJson.error.message;
+            throw err;
+          });
+        }
         return res.json();
       })
       .then(function (json) {
@@ -1181,8 +1196,8 @@
         renderPreview();
         toast('AIがぶんしょうをととのえました');
       })
-      .catch(function () {
-        toast('AIとのつうしんに失敗しました。もういちど試してね');
+      .catch(function (err) {
+        toast(aiErrorMessage(err));
         btn.disabled = false;
         btn.textContent = '✨ AIでぶんしょうをととのえる';
       });
