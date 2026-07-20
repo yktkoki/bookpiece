@@ -386,6 +386,10 @@
         showScreen('screen-settings');
       });
     });
+    // つかいかたは読むだけなのでパスコードなしで開ける
+    qs('[data-action="open-guide"]').addEventListener('click', function () {
+      showScreen('screen-guide');
+    });
   }
 
   // ---------- 本棚 ----------

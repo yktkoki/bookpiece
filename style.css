@@ -644,6 +644,100 @@ body:not(.furigana-on) rt { display: none; }
   z-index: 200;
 }
 
+/* ===== つかいかたガイド（おうちの人向け） ===== */
+.guide-body {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1rem;
+  line-height: 1.8;
+}
+.g-lead { font-size: 0.95rem; color: var(--sub); margin-bottom: 1.2rem; }
+
+.g-section {
+  background: var(--card);
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  padding: 1.3rem 1.1rem;
+  margin-bottom: 1.2rem;
+}
+.g-section > h3 {
+  font-size: 1.05rem;
+  color: var(--main);
+  border-left: 5px solid var(--main);
+  padding-left: 0.6rem;
+  margin-bottom: 0.9rem;
+}
+.g-section p { font-size: 0.92rem; margin-bottom: 0.6rem; }
+.g-section ul { margin: 0.3rem 0 0.8rem 1.2rem; }
+.g-section li { font-size: 0.9rem; margin-bottom: 0.3rem; }
+
+.g-step { display: flex; gap: 0.8rem; margin-bottom: 1.3rem; }
+.g-step:last-child { margin-bottom: 0; }
+.g-step-num {
+  flex: 0 0 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  background: var(--main);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+.g-step-body { flex: 1; min-width: 0; }
+.g-step-body h4 { font-size: 0.98rem; margin: 0.15rem 0 0.35rem; }
+
+.g-screen {
+  display: inline-block;
+  background: var(--main-light);
+  color: var(--main);
+  border-radius: 5px;
+  padding: 0.05rem 0.45rem;
+  font-size: 0.82rem;
+  font-weight: bold;
+}
+
+.g-tip {
+  background: var(--accent-light);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 0.8rem 1rem;
+  margin: 0.8rem 0;
+  font-size: 0.88rem;
+}
+.g-tip strong { color: var(--accent); }
+
+.g-note {
+  background: var(--main-light);
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  margin: 0.8rem 0;
+  font-size: 0.88rem;
+}
+
+.g-qgroup { margin-bottom: 1rem; }
+.g-qgroup h4 { font-size: 0.92rem; color: var(--main); margin-bottom: 0.25rem; }
+.g-qgroup ul { margin-bottom: 0; }
+
+.g-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.g-table-scroll table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.g-table-scroll th,
+.g-table-scroll td {
+  border: 1px solid var(--line);
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+.g-table-scroll th { background: var(--main-light); color: var(--main); white-space: nowrap; }
+
+.g-faq dt { font-weight: bold; margin-top: 0.9rem; font-size: 0.92rem; }
+.g-faq dt::before { content: "Q. "; color: var(--main); }
+.g-faq dd { margin-left: 0; font-size: 0.9rem; }
+.g-faq dd::before { content: "A. "; color: var(--accent); font-weight: bold; }
+
+.g-footer { text-align: center; font-size: 0.82rem; color: var(--sub); margin-top: 1.5rem; }
+
 @media (max-width: 400px) {
   .home-header h1 { font-size: 1.4rem; }
   .child-btn { min-width: 45%; padding: 1.2rem 1rem; }
