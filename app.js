@@ -2,7 +2,7 @@
   'use strict';
 
   var STORAGE_KEY = 'bookpiece-data-v1';
-  var APP_VERSION = '1.3.0';
+  var APP_VERSION = '1.4.0';
 
   var AVATAR_CHOICES = ['🦖', '🐰', '🐱', '🐶', '🦊', '🐼', '🐸', '🦁', '🐯', '🐨', '🦄', '🐥', '🐻', '🐵'];
   var newChildSelectedAvatar = null;
@@ -291,6 +291,8 @@
       cards: [],
       zones: { pool: [], start: [], mid: [], end: [] },
       connectors: {},
+      essayTitle: '',
+      essayAuthor: '',
       essayText: '',
       rawEssayText: '',
       aiPolished: false,
@@ -333,8 +335,11 @@
             var ans = book.answers && book.answers[i];
             card.zone = (ans && ans.zone) || 'mid';
           }
+          if (typeof card.order !== 'number') card.order = i;
         });
       }
+      if (typeof book.essayTitle !== 'string') book.essayTitle = '';
+      if (typeof book.essayAuthor !== 'string') book.essayAuthor = '';
     });
     raw.version = 5;
     return raw;
@@ -802,7 +807,8 @@
   // zone には設計上の正解を持たせ、置いたときのフィードバックに使う。
   function buildCardsFromAnswers(book) {
     book.cards = book.answers.map(function (ans, i) {
-      return { id: 'c' + i, text: ans.text, zone: ans.zone };
+      // order＝インタビューの質問順。ゾーン内をこの順にそろえると物語の流れになる
+      return { id: 'c' + i, text: ans.text, zone: ans.zone, order: i };
     });
     book.zones = { pool: shuffled(book.cards.map(function (c) { return c.id; })), start: [], mid: [], end: [] };
   }
@@ -834,15 +840,25 @@
         var card = cardById(book, cardId);
         moveCardToZoneAtIndex(cardId, (card && card.zone) || 'mid', Infinity, true);
       });
+      // 各ゾーンを質問順(order)にそろえて、物語の流れになるようにする
+      ['start', 'mid', 'end'].forEach(function (zone) {
+        book.zones[zone].sort(function (a, b) {
+          var ca = cardById(book, a), cb = cardById(book, b);
+          return (ca ? ca.order : 0) - (cb ? cb.order : 0);
+        });
+      });
+      saveData();
+      renderPuzzle();
     });
   }
 
   // ---------- カードのドラッグ＆ドロップ ----------
   function onPuzzlePointerDown(ev) {
     if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+    // ドラッグは⠿ハンドルからのみ。カード本文のスワイプは画面スクロールに任せる
+    if (!ev.target.closest('.drag-handle')) return;
     var li = ev.target.closest('.puzzle-card');
     if (!li) return;
-    if (ev.target.closest('.card-move-btns')) return;
 
     dragCtx.pointerId = ev.pointerId;
     dragCtx.cardId = li.getAttribute('data-card');
@@ -978,9 +994,22 @@
     return null;
   }
 
+  // 手札→箱へタップで入れるとき、質問順(order)にそろう位置を返す
+  function sortedInsertIndex(book, zone, cardId) {
+    var arr = book.zones[zone];
+    var card = cardById(book, cardId);
+    var order = card ? card.order : 0;
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i] === cardId) continue;
+      var other = cardById(book, arr[i]);
+      if (other && other.order > order) return i;
+    }
+    return arr.length;
+  }
+
   function moveCardToZone(cardId, targetZone) {
     var book = currentBook();
-    moveCardToZoneAtIndex(cardId, targetZone, book.zones[targetZone].length);
+    moveCardToZoneAtIndex(cardId, targetZone, sortedInsertIndex(book, targetZone, cardId));
   }
 
   function renderPuzzle() {
@@ -1222,14 +1251,33 @@
     return lines;
   }
 
-  function renderPreview() {
+  // タイトル列：上を3マス空けて縦書き。長ければ自動で複数列に折り返す
+  function titleColumns(title) {
+    var t = String(title || '').trim();
+    if (!t) return [[]];
+    return layoutGenko('　　　' + t);
+  }
+
+  // 名前列：下に1マス空けて下詰め（学校提出書式）
+  function nameColumn(name) {
+    var chars = Array.from(String(name || '').trim());
+    if (!chars.length) return [];
+    var maxName = GENKO_ROWS_PER_COLUMN - 1; // 下に1マス空ける分
+    if (chars.length > maxName) chars = chars.slice(0, maxName);
+    var topBlanks = GENKO_ROWS_PER_COLUMN - chars.length - 1;
+    var col = [];
+    for (var i = 0; i < topBlanks; i++) col.push('');
+    chars.forEach(function (ch) { col.push(ch); });
+    col.push(''); // 末尾の1マス空け
+    return col;
+  }
+
+  // 入力欄には触れず、文字数メーターと原稿用紙のマス目だけ描き直す
+  // （タイトル・名前の入力中に呼んでもカーソルが飛ばないようにするため）
+  function renderGenkoOnly() {
     var book = currentBook();
-    var child = getChild(book.childId);
     var target = book.targetChars;
     var text = book.essayText || buildEssayText(book);
-
-    $('preview-book-title').textContent = '「' + book.title + '」を読んで';
-    $('preview-child-name').textContent = child.name;
 
     var charCount = Array.from(text.replace(/\n/g, '')).length;
     var pct = Math.min(100, Math.round((charCount / target) * 100));
@@ -1238,8 +1286,9 @@
 
     var grid = $('genko-grid');
     grid.innerHTML = '';
-    var lines = layoutGenko(text);
-    var colCount = Math.max(lines.length, Math.ceil(target / GENKO_ROWS_PER_COLUMN));
+    // タイトル列群 → 名前列 → 本文列。グリッドは row-reverse で右→左に並ぶ
+    var lines = titleColumns(book.essayTitle).concat([nameColumn(book.essayAuthor)], layoutGenko(text));
+    var colCount = Math.max(lines.length, Math.ceil(target / GENKO_ROWS_PER_COLUMN) + 2);
     for (var c = 0; c < colCount; c++) {
       var col = document.createElement('div');
       col.className = 'genko-col';
@@ -1254,6 +1303,19 @@
       }
       grid.appendChild(col);
     }
+  }
+
+  function renderPreview() {
+    var book = currentBook();
+    var child = getChild(book.childId);
+
+    // タイトル・名前は未設定なら既定値で初期化（あとから入力欄で編集できる）
+    if (!book.essayTitle) book.essayTitle = '「' + book.title + '」を読んで';
+    if (!book.essayAuthor) book.essayAuthor = child ? child.name : '';
+    $('input-essay-title').value = book.essayTitle;
+    $('input-essay-author').value = book.essayAuthor;
+
+    renderGenkoOnly();
 
     var polishBtn = $('btn-ai-polish');
     var revertBtn = $('btn-ai-revert');
@@ -1276,6 +1338,22 @@
   }
 
   function initPreview() {
+    $('input-essay-title').addEventListener('input', function () {
+      var book = currentBook();
+      if (!book) return;
+      book.essayTitle = $('input-essay-title').value;
+      book.updatedAt = Date.now();
+      saveData();
+      renderGenkoOnly();
+    });
+    $('input-essay-author').addEventListener('input', function () {
+      var book = currentBook();
+      if (!book) return;
+      book.essayAuthor = $('input-essay-author').value;
+      book.updatedAt = Date.now();
+      saveData();
+      renderGenkoOnly();
+    });
     $('btn-save-essay').addEventListener('click', function () {
       var book = currentBook();
       if (!book.aiPolished) book.essayText = buildEssayText(book);

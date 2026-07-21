@@ -449,11 +449,17 @@ body:not(.furigana-on) rt { display: none; }
   border-radius: 10px;
   padding: 0.6rem 0.7rem;
   font-size: 0.88rem;
+  touch-action: pan-y;
+}
+.puzzle-card.selected { background: var(--accent); color: #fff; }
+.puzzle-card .drag-handle {
+  color: var(--sub);
+  font-size: 1.15rem;
+  padding: 0.25rem 0.4rem;
+  margin: -0.25rem 0;
   touch-action: none;
   cursor: grab;
 }
-.puzzle-card.selected { background: var(--accent); color: #fff; }
-.puzzle-card .drag-handle { color: var(--sub); font-size: 0.9rem; }
 .puzzle-card.selected .drag-handle { color: rgba(255,255,255,0.7); }
 .puzzle-card .card-text { flex: 1; }
 .puzzle-card .card-move-btns { display: flex; flex-direction: column; gap: 0.15rem; }
@@ -534,9 +540,15 @@ body:not(.furigana-on) rt { display: none; }
 
 /* ===== 原稿用紙プレビュー画面 ===== */
 .preview-body { padding: 1.2rem 1rem; max-width: 700px; margin: 0 auto; }
-.preview-title-block { text-align: center; margin-bottom: 1rem; }
-.preview-book-title { font-size: 1.1rem; font-weight: bold; }
-.preview-child-name { font-size: 0.85rem; color: var(--sub); margin-top: 0.2rem; }
+.preview-title-block { margin-bottom: 1rem; }
+.preview-field-label {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--sub);
+  font-weight: bold;
+  margin: 0.6rem 0 0.25rem;
+}
+.preview-field-label:first-child { margin-top: 0; }
 
 .char-meter-wrap {
   height: 10px;

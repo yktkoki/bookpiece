@@ -134,7 +134,7 @@
       <div class="bar-title"><h2>カードをくみたてよう</h2></div>
       <span></span>
     </header>
-    <p class="puzzle-hint">カードをドラッグして「はじめ・なか・おわり」にいれよう！（タップでもいどうできるよ）</p>
+    <p class="puzzle-hint">カードの ⠿ をつかんで うごかそう（カードをタップして えらび、はこをタップでもOK）。がめんは スクロールできるよ📜</p>
 
     <!-- 手札置き場：ここからカードを3つの箱へ振り分ける -->
     <div class="puzzle-pool puzzle-zone" data-zone="pool" id="puzzle-pool">
@@ -185,8 +185,10 @@
     </header>
     <div class="preview-body">
       <div class="preview-title-block">
-        <div class="preview-book-title" id="preview-book-title"></div>
-        <div class="preview-child-name" id="preview-child-name"></div>
+        <label class="preview-field-label" for="input-essay-title">だいめい</label>
+        <input type="text" id="input-essay-title" class="form-input" maxlength="40" placeholder="れい：「スイミー」を読んで">
+        <label class="preview-field-label" for="input-essay-author">なまえ</label>
+        <input type="text" id="input-essay-author" class="form-input" maxlength="20" placeholder="なまえ">
       </div>
       <div class="char-meter-wrap">
         <div class="char-meter-fill" id="char-meter-fill"></div>
