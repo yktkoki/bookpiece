@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#2d6a3e"/>
+  <!-- モルックのピン（上が斜めに切れている木の棒） -->
+  <path d="M150 168 L362 116 L362 404 Q362 428 338 428 L174 428 Q150 428 150 404 Z" fill="#ecd3a3"/>
+  <path d="M150 396 L362 396 L362 404 Q362 428 338 428 L174 428 Q150 428 150 404 Z" fill="#b98d4f"/>
+  <text x="256" y="330" text-anchor="middle" font-family="Arial Rounded MT Bold, Arial, Helvetica, sans-serif" font-weight="800" font-size="150" fill="#3b2a12">12</text>
+</svg>

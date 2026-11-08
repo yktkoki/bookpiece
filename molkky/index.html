@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>モルック スコア</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#eef2ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121914" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="モルック">
+<!-- claude.ai の Artifact で表示するときに付く土台と同じ指定（単体で開いても同じ見た目にする） -->
+<style>
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+html { background: #eef2ea; }
+@media (prefers-color-scheme: dark) { html { background: #121914; } }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+<style>
+/* Layout: one-screen scoreboard — side rows on top, birch-pin number pad (slanted pin tops) anchored at thumb height */
+:root {
+  --bg: #eef2ea;
+  --surface: #ffffff;
+  --ink: #18221b;
+  --sub: #5b685e;
+  --line: #d2dbce;
+  --pin: #ecd3a3;
+  --pin-edge: #b98d4f;
+  --pin-ink: #3b2a12;
+  --accent: #2d6a3e;
+  --accent-ink: #ffffff;
+  --accent-soft: #dbe9dc;
+  --warn: #b86e00;
+  --warn-soft: #fff0d2;
+  --danger: #c0392b;
+  --danger-soft: #fbe3e0;
+  --miss: #616b63;
+  --miss-ink: #ffffff;
+  --shade: rgba(10, 20, 12, 0.45);
+  --c0: #d64545; --c1: #2f6fd6; --c2: #2e9b57; --c3: #d9a000; --c4: #8e44ad; --c5: #e0702a;
+  --font: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121914; --surface: #1c251f; --ink: #edf3eb; --sub: #9eaca2; --line: #2e3a32;
+    --pin: #dcbd86; --pin-edge: #8f6a37; --pin-ink: #2a1d0a;
+    --accent: #6cc283; --accent-ink: #0f1a12; --accent-soft: #223a2a;
+    --warn: #f0a63a; --warn-soft: #3a2c12; --danger: #ff7b6c; --danger-soft: #3f201c;
+    --miss: #4b544d; --miss-ink: #ffffff; --shade: rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121914; --surface: #1c251f; --ink: #edf3eb; --sub: #9eaca2; --line: #2e3a32;
+  --pin: #dcbd86; --pin-edge: #8f6a37; --pin-ink: #2a1d0a;
+  --accent: #6cc283; --accent-ink: #0f1a12; --accent-soft: #223a2a;
+  --warn: #f0a63a; --warn-soft: #3a2c12; --danger: #ff7b6c; --danger-soft: #3f201c;
+  --miss: #4b544d; --miss-ink: #ffffff; --shade: rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: var(--font); font-weight: 500; font-size: 16px;
+  -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
+  overscroll-behavior: none;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+input { font: inherit; color: var(--ink); -webkit-user-select: text; user-select: text; }
+
+#app {
+  height: 100%; max-width: 560px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.screen { height: 100%; display: flex; flex-direction: column; }
+.top { display: flex; align-items: center; gap: 10px; padding-block: 12px 8px; }
+.top h1 { margin: 0; white-space: nowrap; font-size: 22px; font-weight: 800; letter-spacing: 0.02em; }
+.top .tag { font-size: 12px; color: var(--sub); }
+.top .spacer { flex: 1; }
+.pill { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--ink); }
+.icon-btn { min-width: 44px; height: 44px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); font-size: 15px; font-weight: 800; padding: 0 12px; white-space: nowrap; flex-shrink: 0; }
+
+/* ---------- setup ---------- */
+.scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; padding-bottom: 12px; min-height: 0; }
+.block { display: flex; flex-direction: column; gap: 8px; }
+.label-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.label { font-size: 13px; font-weight: 800; color: var(--sub); letter-spacing: 0.06em; }
+.label-row .label { flex: 1; }
+.small-btn { font-size: 13px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-weight: 800; }
+.small-btn.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 4px; gap: 4px; }
+.seg button { height: 46px; border-radius: 10px; font-weight: 800; font-size: 15px; color: var(--sub); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.hint { margin: 0; font-size: 12px; color: var(--sub); }
+.brush { display: grid; grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); gap: 6px; }
+.brush button { min-height: 52px; border-radius: 12px; font-weight: 800; font-size: 15px; line-height: 1.2; color: #fff; border: 3px solid transparent; opacity: 0.55; }
+.brush button small { display: block; font-size: 11px; font-weight: 500; }
+.brush button.none { background: var(--surface); color: var(--sub); border-color: var(--line); }
+.brush button[aria-pressed="true"] { opacity: 1; border-color: var(--ink); transform: translateY(-2px); box-shadow: 0 3px 0 var(--line); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  min-height: 48px; padding: 6px 16px; border-radius: 999px; font-weight: 800; font-size: 16px;
+  background: var(--surface); border: 2px solid var(--line); color: var(--sub);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.chip.team { color: #fff; border-color: transparent; }
+.chip small { font-size: 11px; opacity: 0.9; }
+.chip.editing { border-style: dashed; border-color: var(--sub); color: var(--ink); background: var(--surface); }
+.guest-form { display: flex; gap: 8px; }
+.guest-form input { flex: 1; min-width: 0; height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); padding: 0 12px; }
+.guest-form button { height: 46px; padding: 0 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); font-weight: 800; }
+.add-form { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; background: var(--surface); border: 2px dashed var(--line); }
+.add-form input { height: 50px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); padding: 0 12px; font-size: 17px; width: 100%; }
+.add-form .seg { background: var(--bg); }
+.add-row { display: flex; gap: 8px; }
+.add-row .seg { flex: 1; }
+.seg-sm button { height: 42px; font-size: 14px; }
+.add-btn { min-height: 50px; padding: 0 18px; border-radius: 12px; background: var(--accent); color: var(--accent-ink); font-weight: 800; font-size: 16px; }
+.add-team { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.add-team .add-btn { color: #fff; }
+#btn-clear-guests { align-self: flex-start; }
+.board .side { flex-shrink: 0; }
+.board.team .side { grid-template-columns: auto 1fr auto; gap: 4px 10px; padding-block: 8px; }
+.board.team .side .sname { font-size: 17px; grid-row: 1; grid-column: 1; }
+.board.team .side .meta { grid-row: 1; grid-column: 2; }
+.board.team .side .score { grid-row: 1 / span 2; grid-column: 3; font-size: 34px; }
+.board.team .members { grid-row: 2; grid-column: 1 / 3; font-size: 14px; color: var(--ink); gap: 4px 12px; }
+.board.team .members span { white-space: nowrap; }
+.board.team .warnline { grid-row: 3; grid-column: 1 / -1; }
+.board.many .side { padding-block: 6px; }
+.board.many .side .score { font-size: 30px; }
+.board.many .side .sname { font-size: 16px; }
+.order { display: flex; flex-direction: column; gap: 6px; }
+.order-team { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 14px; background: var(--surface); border-left: 6px solid var(--tc); }
+.order-team h3 { margin: 0; font-size: 15px; color: var(--ink); flex: 1; }
+.team-head { display: flex; align-items: center; gap: 8px; }
+.team-head button, .seq-row button { width: 44px; height: 44px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); font-size: 14px; }
+.team-head button:disabled, .seq-row button:disabled, .order-row button:disabled { opacity: 0.3; }
+.team-members { display: flex; flex-wrap: wrap; gap: 6px; }
+.team-members span { padding: 4px 10px; border-radius: 999px; background: var(--bg); font-weight: 800; font-size: 14px; }
+.team-members .empty { background: none; font-weight: 500; }
+.seq-row { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border-radius: 12px; background: var(--surface); border-left: 6px solid var(--sc); font-weight: 800; }
+.seq-row .nm { flex: 1; }
+.seq-row .no { width: 22px; font-size: 13px; color: var(--sub); }
+.next .who { font-size: 15px; font-weight: 800; margin-bottom: 6px; }
+.picks { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.picks button { min-height: 44px; padding: 4px 14px; border-radius: 999px; border: 2px solid var(--line); background: var(--surface); font-weight: 800; font-size: 16px; color: var(--sub); }
+.picks button[aria-pressed="true"] { background: var(--nc); border-color: var(--nc); color: #fff; }
+.order-row { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.order-team .order-row { background: var(--bg); }
+.order-row .no { width: 22px; font-size: 13px; color: var(--sub); font-variant-numeric: tabular-nums; }
+.order-row .nm { flex: 1; font-weight: 800; }
+.order-row button { width: 40px; height: 40px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); font-size: 14px; }
+.order-team .order-row button { background: var(--surface); }
+.empty { font-size: 13px; color: var(--sub); }
+.bottom { padding-block: 10px 14px; display: flex; flex-direction: column; gap: 6px; }
+.err { margin: 0; color: var(--danger); font-size: 13px; min-height: 1em; }
+.primary { height: 58px; border-radius: 16px; background: var(--accent); color: var(--accent-ink); font-size: 20px; font-weight: 800; }
+.secondary { height: 52px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); font-size: 16px; font-weight: 800; }
+
+/* ---------- play ---------- */
+.board { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-bottom: 8px; }
+.side {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 10px;
+  text-align: left; width: 100%;
+  padding: 10px 12px 10px 16px; border-radius: 16px; background: var(--surface);
+  border: 2px solid transparent; position: relative; overflow: hidden;
+}
+.side::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 7px; background: var(--sc); }
+.side.now { border-color: var(--ink); box-shadow: 0 4px 0 var(--line); }
+.side.out { opacity: 0.45; }
+.side.out .sname { text-decoration: line-through; }
+.side .sname { font-weight: 800; font-size: 18px; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.side .sname .arrow { color: var(--ink); font-size: 14px; }
+.side .score { font-size: 38px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; text-align: right; grid-row: span 2; }
+.side .meta { display: flex; gap: 10px; align-items: center; font-size: 13px; color: var(--sub); font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+.dots { letter-spacing: 2px; font-size: 13px; }
+.dots.w { color: var(--warn); font-weight: 800; }
+.members { grid-column: 1 / -1; font-size: 12.5px; color: var(--sub); display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.members .cur { color: var(--ink); font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+.members .zz { opacity: 0.6; }
+.warnline { grid-column: 1 / -1; font-size: 12px; font-weight: 800; color: var(--warn); background: var(--warn-soft); border-radius: 8px; padding: 2px 8px; justify-self: start; }
+.next { text-align: center; font-size: 18px; font-weight: 800; padding-block: 6px; }
+.next b { font-size: 24px; color: var(--nc, var(--ink)); }
+.pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding-bottom: 14px; }
+.pin {
+  height: clamp(54px, 8.6vh, 74px); border-radius: 10px 10px 14px 14px;
+  background: linear-gradient(180deg, var(--pin), var(--pin) 70%, var(--pin-edge) 140%);
+  color: var(--pin-ink); font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums;
+  clip-path: polygon(0 16%, 100% 0, 100% 100%, 0 100%);
+  padding-top: 6px; box-shadow: inset 0 -5px 0 var(--pin-edge);
+  touch-action: manipulation;
+}
+.pin:active, .miss-btn:active, .undo-btn:active { transform: translateY(2px); filter: brightness(0.92); }
+.miss-btn { grid-column: span 3; height: clamp(50px, 7.5vh, 64px); border-radius: 14px; background: var(--miss); color: var(--miss-ink); font-size: 20px; font-weight: 800; touch-action: manipulation; }
+.undo-btn { height: clamp(50px, 7.5vh, 64px); border-radius: 14px; background: var(--surface); border: 2px solid var(--line); font-size: 15px; font-weight: 800; touch-action: manipulation; }
+.pad.disabled .pin, .pad.disabled .miss-btn { opacity: 0.35; pointer-events: none; }
+
+/* ---------- toast ---------- */
+.toast {
+  position: fixed; left: 50%; top: 38%; transform: translate(-50%, -50%) scale(0.9);
+  min-width: 240px; max-width: calc(100% - 48px); padding: 18px 22px; border-radius: 22px;
+  background: var(--ink); color: var(--bg); text-align: center; z-index: 30;
+  opacity: 0; pointer-events: none; transition: opacity 0.15s, transform 0.15s;
+}
+.toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.toast .t1 { font-size: 30px; font-weight: 800; }
+.toast .t2 { font-size: 17px; margin-top: 4px; }
+.toast.bad { background: var(--danger); color: #fff; }
+.toast.warn { background: var(--warn); color: #1d1300; }
+
+/* ---------- result ---------- */
+.result-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding-block: 8px; }
+.winner { text-align: center; padding: 26px 16px; border-radius: 22px; background: var(--surface); border-top: 10px solid var(--wc, var(--accent)); }
+.winner .crown { font-size: 14px; color: var(--sub); font-weight: 800; letter-spacing: 0.1em; }
+.winner .wname { font-size: 34px; font-weight: 800; margin-top: 6px; text-wrap: balance; animation: pop 0.6s ease-out; }
+.winner .why { font-size: 15px; color: var(--sub); margin-top: 6px; }
+@keyframes pop { 0% { transform: scale(0.6); } 70% { transform: scale(1.08); } 100% { transform: scale(1); } }
+.rank { display: flex; flex-direction: column; gap: 6px; }
+.rank-row { display: grid; grid-template-columns: 28px 1fr auto; gap: 4px 10px; align-items: center; padding: 10px 12px; border-radius: 14px; background: var(--surface); border-left: 6px solid var(--sc); }
+.rank-row .pos { font-weight: 800; color: var(--sub); font-variant-numeric: tabular-nums; }
+.rank-row .nm { font-weight: 800; }
+.rank-row .pt { font-weight: 800; font-size: 22px; font-variant-numeric: tabular-nums; }
+.rank-row .mem { grid-column: 2 / -1; font-size: 12.5px; color: var(--sub); }
+.result-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-block: 8px 14px; }
+.result-actions .primary { grid-column: 1 / -1; }
+
+/* ---------- sheet ---------- */
+.backdrop { position: fixed; inset: 0; background: var(--shade); z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
+.sheet {
+  width: 100%; max-width: 560px; max-height: 80%; overflow-y: auto; background: var(--bg);
+  border-radius: 22px 22px 0 0; display: flex; flex-direction: column; gap: 12px;
+  padding-block: 18px calc(18px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.sheet h2 { margin: 0; font-size: 18px; }
+.sheet .rows { display: flex; flex-direction: column; gap: 6px; }
+.throw { display: grid; grid-template-columns: 28px 1fr auto auto; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 12px; background: var(--surface); font-variant-numeric: tabular-nums; }
+.throw .i { color: var(--sub); font-size: 13px; }
+.throw .v { font-weight: 800; font-size: 18px; }
+.throw .a { color: var(--sub); font-size: 14px; min-width: 64px; text-align: right; }
+.throw .ev { grid-column: 2 / -1; font-size: 12px; font-weight: 800; }
+.ev.bad { color: var(--danger); } .ev.warn { color: var(--warn); } .ev.good { color: var(--accent); }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 8px 8px 14px; background: var(--surface); border-radius: 12px; font-weight: 800; }
+.toggle-row button { min-width: 108px; height: 42px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-weight: 800; font-size: 14px; }
+.toggle-row button.on { background: var(--warn-soft); border-color: var(--warn); color: var(--ink); }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field input[type="text"] { height: 50px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); padding: 0 12px; font-size: 18px; }
+.check { display: flex; align-items: center; gap: 10px; font-weight: 800; }
+.check input { width: 22px; height: 22px; accent-color: var(--accent); }
+.danger-btn { height: 50px; border-radius: 14px; background: var(--danger-soft); color: var(--danger); font-weight: 800; border: 1px solid var(--danger); }
+.danger-btn.armed { background: var(--danger); color: #fff; }
+.rule-note { font-size: 13px; color: var(--sub); line-height: 1.7; margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .toast, .winner .wname { transition: none; animation: none; }
+}
+</style>
+
+</head>
+<body>
+
+<div id="app">
+  <!-- 準備画面 -->
+  <section id="setup" class="screen" hidden>
+    <div class="top">
+      <h1>モルック</h1><span class="tag">てんすうボード</span>
+    </div>
+    <div class="scroll">
+      <div class="block">
+        <div class="label">あそびかた</div>
+        <div class="seg" id="seg-mode">
+          <button type="button" data-act="mode" data-v="solo">こじん戦</button>
+          <button type="button" data-act="mode" data-v="team">チーム戦</button>
+        </div>
+      </div>
+      <div class="block" id="block-teams">
+        <div class="label">チームの数</div>
+        <div class="seg" id="seg-teams">
+          <button type="button" data-act="teams" data-v="2">2</button>
+          <button type="button" data-act="teams" data-v="3">3</button>
+          <button type="button" data-act="teams" data-v="4">4</button>
+        </div>
+      </div>
+      <div class="block">
+        <div class="label">3かい つづけてミスしたら</div>
+        <div class="seg" id="seg-rule">
+          <button type="button" data-act="rule" data-v="zero">0てんにもどる</button>
+          <button type="button" data-act="rule" data-v="out">しっかく</button>
+        </div>
+      </div>
+      <div class="block">
+        <div class="label-row">
+          <span class="label">だれがやる？</span>
+          <button type="button" class="small-btn" id="btn-edit" data-act="editmode">なまえを変える</button>
+        </div>
+        <p class="hint" id="chip-hint"></p>
+        <div class="brush" id="brush"></div>
+        <div class="chips" id="chips"></div>
+        <form class="add-form" id="guest-form">
+          <div class="label">人を追加（友だち・ゲスト）</div>
+          <input id="guest-name" type="text" maxlength="12" placeholder="なまえ（例：たろう）" autocomplete="off" enterkeyhint="done">
+          <div class="add-row">
+            <div class="seg seg-sm" id="seg-age">
+              <button type="button" data-act="age" data-v="adult">おとな</button>
+              <button type="button" data-act="age" data-v="kid">こども</button>
+            </div>
+            <button type="submit" class="add-btn">＋ 追加</button>
+          </div>
+          <p class="hint" id="add-msg">つづけて何人でも追加できます</p>
+        </form>
+        <button type="button" class="small-btn" id="btn-clear-guests" data-act="clearguests">追加した人を まとめてけす</button>
+      </div>
+      <div class="block">
+        <div class="label-row">
+          <span class="label">なげる順番</span>
+          <button type="button" class="small-btn" id="btn-auto" data-act="auto">おまかせで分ける</button>
+          <button type="button" class="small-btn" data-act="shuffle">シャッフル</button>
+        </div>
+        <div class="order" id="order"></div>
+      </div>
+    </div>
+    <div class="bottom">
+      <p class="err" id="setup-err"></p>
+      <button type="button" class="primary" data-act="start">スタート</button>
+    </div>
+  </section>
+
+  <!-- プレイ画面 -->
+  <section id="play" class="screen" hidden>
+    <div class="top">
+      <h1>モルック</h1>
+      <span class="pill" id="rule-pill"></span>
+      <span class="spacer"></span>
+      <button type="button" class="icon-btn" data-act="menu" aria-label="メニュー">メニュー</button>
+    </div>
+    <div class="board" id="board"></div>
+    <div class="next" id="next"></div>
+    <div class="pad" id="pad">
+      <button type="button" class="pin" data-act="pts" data-v="1">1</button>
+      <button type="button" class="pin" data-act="pts" data-v="2">2</button>
+      <button type="button" class="pin" data-act="pts" data-v="3">3</button>
+      <button type="button" class="pin" data-act="pts" data-v="4">4</button>
+      <button type="button" class="pin" data-act="pts" data-v="5">5</button>
+      <button type="button" class="pin" data-act="pts" data-v="6">6</button>
+      <button type="button" class="pin" data-act="pts" data-v="7">7</button>
+      <button type="button" class="pin" data-act="pts" data-v="8">8</button>
+      <button type="button" class="pin" data-act="pts" data-v="9">9</button>
+      <button type="button" class="pin" data-act="pts" data-v="10">10</button>
+      <button type="button" class="pin" data-act="pts" data-v="11">11</button>
+      <button type="button" class="pin" data-act="pts" data-v="12">12</button>
+      <button type="button" class="miss-btn" data-act="pts" data-v="0">0　ミス</button>
+      <button type="button" class="undo-btn" data-act="undo">↩ もどす</button>
+    </div>
+  </section>
+
+  <!-- 結果画面 -->
+  <section id="result" class="screen" hidden>
+    <div class="top"><h1>モルック</h1><span class="tag">けっか</span></div>
+    <div class="result-body">
+      <div class="winner" id="winner"></div>
+      <div class="rank" id="rank"></div>
+    </div>
+    <div class="result-actions">
+      <button type="button" class="primary" data-act="again">おなじメンバーで もう一回</button>
+      <button type="button" class="secondary" data-act="change">メンバーを変える</button>
+      <button type="button" class="secondary" data-act="undo">↩ もどす</button>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"><div class="t1"></div><div class="t2"></div></div>
+<div class="backdrop" id="backdrop" hidden><div class="sheet" id="sheet"></div></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- 保存 ----------
+  const mem = {};
+  const store = {
+    get(k, d) {
+      try { const v = localStorage.getItem("molkky." + k); if (v) return JSON.parse(v); } catch (e) {}
+      return k in mem ? mem[k] : d;
+    },
+    set(k, v) {
+      mem[k] = v;
+      try { if (v === null) localStorage.removeItem("molkky." + k); else localStorage.setItem("molkky." + k, JSON.stringify(v)); } catch (e) {}
+    }
+  };
+
+  const COLORS = ["var(--c0)", "var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)", "var(--c5)"];
+  const TEAM_NAMES = ["あか", "あお", "みどり", "きいろ"];
+  const DEFAULT_PLAYERS = [
+    { id: "p1", name: "パパ", adult: true },
+    { id: "p2", name: "ママ", adult: true },
+    { id: "p3", name: "しゅうや", adult: false },
+    { id: "p4", name: "けいと", adult: false },
+    { id: "p5", name: "いぶき", adult: false }
+  ];
+
+  let players = store.get("players", null) || DEFAULT_PLAYERS.map(p => ({ ...p }));
+  let setup = store.get("setup", null) || {
+    mode: "solo", missRule: "zero", teamCount: 2,
+    order: DEFAULT_PLAYERS.map(p => p.id),
+    solo: { p1: true, p2: true, p3: true, p4: true, p5: true },
+    assign: { p1: 0, p2: 1, p3: 1, p4: 0, p5: 0 }
+  };
+  let game = store.get("game", null);
+  let editMode = false;
+  let addAdult = true;
+  let brush = 0; // チーム分けで えらんでいるチーム（-1 = やらない）
+  const isGuest = id => !DEFAULT_PLAYERS.some(d => d.id === id);
+
+  function addPlayer(name, adult, team) {
+    const id = "g" + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
+    players.push({ id, name, adult });
+    setup.order.push(id);
+    setup.solo[id] = true;
+    if (team !== undefined) setup.assign[id] = team;
+    else if (setup.mode === "team") {
+      const size = Array(setup.teamCount).fill(0);
+      players.forEach(p => { const t = setup.assign[p.id]; if (t >= 0 && t < setup.teamCount) size[t]++; });
+      setup.assign[id] = size.indexOf(Math.min(...size));
+    } else setup.assign[id] = -1;
+    saveSetup();
+    return id;
+  }
+  function setAge(segId, adult) {
+    addAdult = adult;
+    const seg = $(segId);
+    if (seg) seg.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String((b.dataset.v === "adult") === adult)));
+  }
+
+  function normalizeSetup() {
+    const ids = players.map(p => p.id);
+    setup.order = setup.order.filter(id => ids.includes(id));
+    ids.forEach(id => { if (!setup.order.includes(id)) setup.order.push(id); });
+    setup.solo = setup.solo || {};
+    setup.assign = setup.assign || {};
+    ids.forEach(id => { if (setup.assign[id] === undefined) setup.assign[id] = -1; });
+    fixTeamSeq();
+  }
+  function fixTeamSeq() {
+    const seq = (setup.teamSeq || []).filter(t => t >= 0 && t < setup.teamCount);
+    for (let t = 0; t < setup.teamCount; t++) if (!seq.includes(t)) seq.push(t);
+    setup.teamSeq = seq;
+  }
+  normalizeSetup();
+
+  const saveSetup = () => { store.set("players", players); store.set("setup", setup); };
+  const saveGame = () => store.set("game", game);
+  const nameOf = id => (players.find(p => p.id === id) || {}).name || "？";
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const $ = id => document.getElementById(id);
+
+  // なげる順番（sides の番号の並び）。足りない分は うしろに足す
+  function seqOf(g) {
+    const n = g.sides.length;
+    const seq = (g.seq || []).filter(i => i >= 0 && i < n);
+    for (let i = 0; i < n; i++) if (!seq.includes(i)) seq.push(i);
+    return seq;
+  }
+
+  // ---------- 点数計算（投球ログから毎回計算し直す） ----------
+  function compute(g) {
+    const n = g.sides.length;
+    const seq = seqOf(g);
+    const S = g.sides.map(() => ({ score: 0, miss: 0, out: false, lastAt: {}, throws: [], pts: {} }));
+    let lastPos = ((g.start || 0) - 1 + n) % n, winner = -1, last = null;
+    g.log.forEach((e, li) => { if (winner >= 0) return;
+      const s = S[e.s];
+      let type = "ok";
+      s.pts[e.p] = (s.pts[e.p] || 0) + e.v;
+      if (e.v === 0) {
+        s.miss++; type = "miss";
+        if (s.miss >= 3) {
+          if (g.missRule === "out") { s.out = true; type = "out"; }
+          else { s.score = 0; s.miss = 0; type = "zero"; }
+        }
+      } else {
+        s.miss = 0; s.score += e.v;
+        if (s.score > 50) { s.score = 25; type = "bust"; }
+        else if (s.score === 50) { type = "win"; winner = e.s; }
+      }
+      s.lastAt[e.p] = li;
+      lastPos = seq.indexOf(e.s);
+      last = { s: e.s, p: e.p, v: e.v, type, after: s.score, miss: s.miss };
+      s.throws.push(last);
+    });
+    const alive = S.map((_, i) => i).filter(i => !S[i].out);
+    let over = winner >= 0, reason = winner >= 0 ? "fifty" : "";
+    if (!over && n > 1 && alive.length === 1) { winner = alive[0]; over = true; reason = "last"; }
+    if (!over && alive.length === 0) { over = true; reason = "none"; }
+    let next = null;
+    if (!over) {
+      for (let k = 1; k <= n && !next; k++) {
+        const i = seq[(lastPos + k) % n];
+        if (S[i].out) continue;
+        // チームの中では「いちばん長く なげていない人」をおすすめにする
+        const cands = g.sides[i].members.filter(id => !g.rest.includes(id));
+        if (!cands.length) continue;
+        const at = id => (id in S[i].lastAt ? S[i].lastAt[id] : -1);
+        const pid = cands.reduce((a, b2) => (at(b2) < at(a) ? b2 : a));
+        next = { side: i, pid, cands };
+      }
+    }
+    return { S, winner, over, reason, next, last };
+  }
+
+  // ---------- 画面切り替え ----------
+  let wakeLock = null;
+  async function keepAwake(on) {
+    try {
+      if (on && !wakeLock && navigator.wakeLock && document.visibilityState === "visible") {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", () => { wakeLock = null; });
+      } else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+    } catch (e) { wakeLock = null; }
+  }
+  document.addEventListener("visibilitychange", () => { if (!$("play").hidden) keepAwake(true); });
+
+  function show(name) {
+    ["setup", "play", "result"].forEach(s => { $(s).hidden = s !== name; });
+    keepAwake(name === "play");
+    if (name === "setup") renderSetup();
+    if (name === "play") renderPlay();
+    if (name === "result") renderResult();
+  }
+
+  // ---------- 準備画面 ----------
+  function participants() {
+    return setup.mode === "solo"
+      ? setup.order.filter(id => setup.solo[id])
+      : setup.order.filter(id => setup.assign[id] >= 0 && setup.assign[id] < setup.teamCount);
+  }
+
+  function renderSetup() {
+    const setPressed = (segId, val) => $(segId).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === String(val))));
+    setPressed("seg-mode", setup.mode);
+    setPressed("seg-rule", setup.missRule);
+    setPressed("seg-teams", setup.teamCount);
+    setAge("seg-age", addAdult);
+    $("btn-clear-guests").hidden = !players.some(p => isGuest(p.id)) || editMode;
+    const team = setup.mode === "team";
+    $("block-teams").hidden = !team;
+    $("btn-auto").hidden = !team;
+    $("btn-edit").classList.toggle("on", editMode);
+    $("btn-edit").textContent = editMode ? "おわる" : "なまえを変える";
+    $("chip-hint").textContent = editMode
+      ? "変えたい人をタップ"
+      : team ? "① 上でチームをえらぶ → ② 入れたい人をタップ（もう一度タップで はずす）" : "タップで さんか／やすみ を切りかえ";
+    if (brush >= setup.teamCount) brush = 0;
+    $("brush").hidden = !team || editMode;
+    if (team && !editMode) {
+      const cnt = t => setup.order.filter(id => setup.assign[id] === t).length;
+      let h = "";
+      for (let t = 0; t < setup.teamCount; t++) h += `<button type="button" style="background:${COLORS[t]}" data-act="brush" data-v="${t}" aria-pressed="${brush === t}">${TEAM_NAMES[t]}<small>${cnt(t)}人</small></button>`;
+      h += `<button type="button" class="none" data-act="brush" data-v="-1" aria-pressed="${brush === -1}">やらない</button>`;
+      $("brush").innerHTML = h;
+    }
+
+    $("chips").innerHTML = setup.order.map(id => {
+      const p = players.find(x => x.id === id);
+      if (editMode) return `<button type="button" class="chip editing" data-act="edit" data-id="${id}">✎ ${esc(p.name)}</button>`;
+      if (team) {
+        const t = setup.assign[id];
+        if (t >= 0 && t < setup.teamCount) return `<button type="button" class="chip team" style="background:${COLORS[t]}" data-act="chip" data-id="${id}">${esc(p.name)} <small>${TEAM_NAMES[t]}</small></button>`;
+        return `<button type="button" class="chip" data-act="chip" data-id="${id}">${esc(p.name)}</button>`;
+      }
+      return `<button type="button" class="chip${setup.solo[id] ? " on" : ""}" data-act="chip" data-id="${id}">${esc(p.name)}</button>`;
+    }).join("");
+
+    const row = (id, i, list) => `<div class="order-row"><span class="no">${i + 1}</span><span class="nm">${esc(nameOf(id))}</span>
+      <button type="button" data-act="up" data-id="${id}" aria-label="上へ" ${i === 0 ? "disabled" : ""}>▲</button>
+      <button type="button" data-act="down" data-id="${id}" aria-label="下へ" ${i === list.length - 1 ? "disabled" : ""}>▼</button></div>`;
+    if (team) {
+      let html = "";
+      fixTeamSeq();
+      setup.teamSeq.forEach((t, k) => {
+        const m = setup.order.filter(id => setup.assign[id] === t);
+        html += `<div class="order-team" style="--tc:${COLORS[t]}">
+          <div class="team-head"><h3>${k + 1}ばん目：${TEAM_NAMES[t]}チーム</h3>
+            <button type="button" data-act="tup" data-k="${k}" aria-label="チームを上へ" ${k === 0 ? "disabled" : ""}>▲</button>
+            <button type="button" data-act="tdown" data-k="${k}" aria-label="チームを下へ" ${k === setup.teamSeq.length - 1 ? "disabled" : ""}>▼</button></div>
+          <div class="team-members">${m.length ? m.map(id => `<span>${esc(nameOf(id))}</span>`).join("") : '<span class="empty">まだ だれもいません</span>'}</div></div>`;
+      });
+      $("order").innerHTML = html + '<p class="hint">チームの中で だれが なげるかは、ゲーム中に その場で えらべます</p>';
+    } else {
+      const list = participants();
+      $("order").innerHTML = list.length ? list.map(row).join("") : '<div class="empty">上で さんかする人をえらんでください</div>';
+    }
+  }
+
+  function moveInOrder(id, dir) {
+    const list = setup.mode === "team"
+      ? setup.order.filter(x => setup.assign[x] === setup.assign[id])
+      : participants();
+    const i = list.indexOf(id), j = i + dir;
+    if (j < 0 || j >= list.length) return;
+    const a = setup.order.indexOf(list[i]), b = setup.order.indexOf(list[j]);
+    [setup.order[a], setup.order[b]] = [setup.order[b], setup.order[a]];
+  }
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+    return arr;
+  }
+
+  function autoTeams() {
+    let ids = participants();
+    if (!ids.length) ids = players.map(p => p.id);
+    const n = setup.teamCount, size = Array(n).fill(0);
+    players.forEach(p => { setup.assign[p.id] = -1; });
+    const adults = shuffle(ids.filter(id => (players.find(p => p.id === id) || {}).adult));
+    const kids = shuffle(ids.filter(id => !(players.find(p => p.id === id) || {}).adult));
+    const teamOrder = shuffle([...Array(n).keys()]);
+    adults.forEach((id, i) => { const t = teamOrder[i % n]; setup.assign[id] = t; size[t]++; });
+    kids.forEach(id => {
+      const min = Math.min(...size);
+      const cands = shuffle([...Array(n).keys()].filter(t => size[t] === min));
+      setup.assign[id] = cands[0]; size[cands[0]]++;
+    });
+    shuffle(setup.order);
+  }
+
+  function startGame() {
+    let sides;
+    if (setup.mode === "solo") {
+      const list = participants();
+      if (!list.length) return "さんかする人を えらんでください";
+      sides = list.map((id, i) => ({ name: nameOf(id), color: COLORS[i % COLORS.length], members: [id] }));
+    } else {
+      sides = [];
+      for (let t = 0; t < setup.teamCount; t++) {
+        const m = setup.order.filter(id => setup.assign[id] === t);
+        if (!m.length) return `${TEAM_NAMES[t]}チームに 人がいません`;
+        sides.push({ name: TEAM_NAMES[t] + "チーム", color: COLORS[t], members: m });
+      }
+    }
+    const names = {};
+    players.forEach(p => { names[p.id] = p.name; });
+    const seq = setup.mode === "team" ? setup.teamSeq.slice() : sides.map((_, i) => i);
+    game = { mode: setup.mode, missRule: setup.missRule, sides, seq, names, start: 0, log: [], rest: [] };
+    saveGame();
+    show("play");
+    return "";
+  }
+
+  // ---------- プレイ画面 ----------
+  const gName = id => (game && game.names[id]) || nameOf(id);
+
+  let pick = null; // チーム戦で その場でえらんだ人
+  function thrower(r) {
+    if (!r.next) return null;
+    return pick && r.next.cands.includes(pick) ? pick : r.next.pid;
+  }
+
+  function renderPlay() {
+    if (!game) return;
+    const r = compute(game);
+    const who = thrower(r);
+    $("rule-pill").textContent = (game.mode === "team" ? "チーム戦" : "こじん戦") + "・3ミス" + (game.missRule === "out" ? "しっかく" : "0てん");
+    $("board").innerHTML = game.sides.map((sd, i) => {
+      const s = r.S[i], now = r.next && r.next.side === i;
+      const dots = "●".repeat(s.miss) + "○".repeat(Math.max(0, 3 - s.miss));
+      let members = "";
+      if (game.mode === "team") {
+        members = `<div class="members">${sd.members.map(id => {
+          const cls = (now && who === id ? "cur" : "") + (game.rest.includes(id) ? " zz" : "");
+          return `<span class="${cls}">${esc(gName(id))} ${s.pts[id] || 0}${game.rest.includes(id) ? "（おやすみ）" : ""}</span>`;
+        }).join("")}</div>`;
+      } else if (game.rest.includes(sd.members[0])) {
+        members = `<div class="members"><span class="zz">おやすみ中</span></div>`;
+      }
+      const warn = !s.out && s.miss === 2 ? `<div class="warnline">あと1回ミスで ${game.missRule === "out" ? "しっかく" : "0てん"}！</div>` : "";
+      return `<button type="button" class="side${now ? " now" : ""}${s.out ? " out" : ""}" style="--sc:${sd.color}" data-act="hist" data-i="${i}">
+        <div class="sname">${now ? '<span class="arrow">▶</span>' : ""}${esc(game.mode === "team" ? sd.name : gName(sd.members[0]))}${s.out ? "（しっかく）" : ""}</div>
+        <div class="score">${s.score}</div>
+        <div class="meta"><span>あと ${50 - s.score}</span><span class="dots${s.miss === 2 ? " w" : ""}" aria-label="れんぞくミス ${s.miss}回">${dots}</span></div>
+        ${members}${warn}</button>`;
+    }).join("");
+    $("board").classList.toggle("many", game.sides.length > 5);
+    $("board").classList.toggle("team", game.mode === "team");
+    const cur = $("board").querySelector(".side.now");
+    if (cur) cur.scrollIntoView({ block: "nearest" });
+    if (r.next && game.mode === "team") {
+      $("next").style.setProperty("--nc", game.sides[r.next.side].color);
+      $("next").innerHTML = `<div class="who">${esc(game.sides[r.next.side].name)}の番：だれが なげる？</div>
+        <div class="picks">${r.next.cands.map(id => `<button type="button" data-act="pick" data-id="${id}" aria-pressed="${id === who}">${esc(gName(id))}</button>`).join("")}</div>`;
+    } else if (r.next) {
+      $("next").style.setProperty("--nc", game.sides[r.next.side].color);
+      $("next").innerHTML = `つぎは <b>${esc(gName(who))}</b>`;
+    } else {
+      $("next").innerHTML = r.over ? "おわり" : "みんな おやすみ中（メニューからもどせます）";
+    }
+    $("pad").classList.toggle("disabled", !r.next);
+  }
+
+  let locked = false, toastTimer = null;
+  function toast(t1, t2, kind) {
+    const el = $("toast");
+    el.querySelector(".t1").textContent = t1;
+    el.querySelector(".t2").textContent = t2 || "";
+    el.className = "toast show" + (kind ? " " + kind : "");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = "toast" + (kind ? " " + kind : ""); }, 1300);
+  }
+
+  function addPoints(v) {
+    if (locked || !game) return;
+    const before = compute(game);
+    if (!before.next) return;
+    locked = true;
+    setTimeout(() => { locked = false; }, 400);
+    game.log.push({ s: before.next.side, p: thrower(before), v });
+    pick = null;
+    saveGame();
+    const r = compute(game), e = r.last, nm = gName(e.p);
+    const sideName = game.sides[e.s].name;
+    if (e.type === "ok") toast(`${nm} ＋${e.v}`, `${e.after}てん（あと ${50 - e.after}）`);
+    else if (e.type === "miss") toast(`${nm} ミス`, `れんぞく ${e.miss}回目${e.miss === 2 ? "　あと1回で" + (game.missRule === "out" ? "しっかく" : "0てん") + "！" : ""}`, e.miss === 2 ? "warn" : "");
+    else if (e.type === "zero") toast("3回ミス…", `${game.mode === "team" ? sideName : nm}は 0てんに もどる`, "bad");
+    else if (e.type === "out") toast("3回ミス…", `${game.mode === "team" ? sideName : nm}は しっかく`, "bad");
+    else if (e.type === "bust") toast(`${nm} ＋${e.v}`, "50をこえた！ 25てんに もどる", "bad");
+    else if (e.type === "win") toast(`${nm} ＋${e.v}`, "50てん ぴったり！");
+    renderPlay();
+    if (r.over) {
+      locked = true;
+      setTimeout(() => { locked = false; show("result"); }, 1100);
+    }
+  }
+
+  function undo() {
+    if (!game || !game.log.length) { toast("もどせる記録が ありません", ""); return; }
+    const e = game.log.pop();
+    pick = null;
+    saveGame();
+    toast("1つ もどしました", `${gName(e.p)} の ${e.v}てん を けしました`);
+    show("play");
+  }
+
+  // ---------- シート ----------
+  function openSheet(html) { $("sheet").innerHTML = html; $("backdrop").hidden = false; }
+  function closeSheet() { $("backdrop").hidden = true; $("sheet").innerHTML = ""; }
+  $("backdrop").addEventListener("click", e => { if (e.target === $("backdrop")) closeSheet(); });
+
+  const EV = {
+    ok: ["", ""], miss: ["ミス", "warn"], zero: ["3回ミス → 0てんにもどる", "bad"], out: ["3回ミス → しっかく", "bad"],
+    bust: ["50をこえた → 25てんにもどる", "bad"], win: ["50てん ぴったり！", "good"]
+  };
+  function openHistory(i) {
+    const r = compute(game), sd = game.sides[i], th = r.S[i].throws;
+    const title = game.mode === "team" ? sd.name : gName(sd.members[0]);
+    openSheet(`<h2>${esc(title)} のきろく</h2><div class="rows">${th.length ? th.map((t, k) => `
+      <div class="throw"><span class="i">${k + 1}</span><span>${game.mode === "team" ? esc(gName(t.p)) : ""}</span><span class="v">${t.v === 0 ? "ミス" : "＋" + t.v}</span><span class="a">→ ${t.after}てん</span>
+      ${EV[t.type][0] && t.type !== "miss" ? `<span class="ev ${EV[t.type][1]}">${EV[t.type][0]}</span>` : ""}</div>`).join("") : '<div class="empty">まだ なげていません</div>'}</div>
+      <button type="button" class="secondary" data-act="close">とじる</button>`);
+  }
+
+  function openMenu() {
+    const ids = game.sides.flatMap(s => s.members);
+    openSheet(`<h2>メニュー</h2>
+      <div class="label">おやすみ（順番を とばす）</div>
+      <div class="rows">${ids.map(id => `<div class="toggle-row"><span>${esc(gName(id))}</span>
+        <button type="button" class="${game.rest.includes(id) ? "on" : ""}" data-act="rest" data-id="${id}">${game.rest.includes(id) ? "おやすみ中" : "さんか中"}</button></div>`).join("")}</div>
+      <div class="label">なげる順番を かえる</div>
+      <p class="hint">さいごに なげた人（チーム）の つぎから、新しい順番で 回ります</p>
+      <div class="rows">${seqOf(game).map((si, k, arr) => `<div class="seq-row" style="--sc:${game.sides[si].color}"><span class="no">${k + 1}</span>
+        <span class="nm">${esc(game.mode === "team" ? game.sides[si].name : gName(game.sides[si].members[0]))}</span>
+        <button type="button" data-act="sup" data-k="${k}" aria-label="上へ" ${k === 0 ? "disabled" : ""}>▲</button>
+        <button type="button" data-act="sdown" data-k="${k}" aria-label="下へ" ${k === arr.length - 1 ? "disabled" : ""}>▼</button></div>`).join("")}</div>
+      <div class="label">とちゅうから 人を追加</div>
+      <div class="add-form">
+        <input id="mid-name" type="text" maxlength="12" placeholder="なまえ" autocomplete="off" enterkeyhint="done">
+        <div class="seg seg-sm" id="seg-age2">
+          <button type="button" data-act="age2" data-v="adult" aria-pressed="${addAdult}">おとな</button>
+          <button type="button" data-act="age2" data-v="kid" aria-pressed="${!addAdult}">こども</button>
+        </div>
+        ${game.mode === "team"
+          ? `<div class="add-team">${game.sides.map((sd, i) => `<button type="button" class="add-btn" style="background:${sd.color}" data-act="midadd" data-t="${i}">＋ ${esc(sd.name)}へ</button>`).join("")}</div>
+             <p class="hint">チームの さいごの順番に はいります</p>`
+          : `<button type="button" class="add-btn" data-act="midadd">＋ 追加する</button>
+             <p class="hint">0てんから スタート。順番は いちばん さいごに はいります</p>`}
+      </div>
+      <p class="rule-note">ルール：ちょうど50てんで かち。50をこえたら25てんにもどる。3回つづけてミスしたら${game.missRule === "out" ? "しっかく" : "0てんにもどる"}。</p>
+      <button type="button" class="danger-btn" id="btn-quit" data-act="quit">ゲームをやめて メンバーを変える</button>
+      <button type="button" class="secondary" data-act="close">とじる</button>`);
+  }
+
+  function openEdit(id) {
+    const p = players.find(x => x.id === id);
+    if (!p) return;
+    const guest = isGuest(id);
+    openSheet(`<h2>なまえを変える</h2>
+      <div class="field"><label class="label" for="edit-name">なまえ</label><input type="text" id="edit-name" maxlength="12" value="${esc(p.name)}"></div>
+      <label class="check"><input type="checkbox" id="edit-adult" ${p.adult ? "checked" : ""}> おとな（おまかせで分けるときに使う）</label>
+      <button type="button" class="primary" data-act="editsave" data-id="${id}">保存</button>
+      ${guest ? `<button type="button" class="danger-btn" id="btn-del" data-act="del" data-id="${id}">この人を けす</button>` : ""}
+      <button type="button" class="secondary" data-act="close">とじる</button>`);
+  }
+
+  // ---------- 結果画面 ----------
+  function renderResult() {
+    if (!game) return;
+    const r = compute(game);
+    const label = i => game.mode === "team" ? game.sides[i].name : gName(game.sides[i].members[0]);
+    if (r.winner >= 0) {
+      $("winner").style.setProperty("--wc", game.sides[r.winner].color);
+      $("winner").innerHTML = `<div class="crown">WINNER</div><div class="wname">${esc(label(r.winner))} の かち！</div>
+        <div class="why">${r.reason === "fifty" ? "50てん ぴったり！" : "ほかの人が みんな しっかく"}</div>`;
+    } else {
+      $("winner").style.removeProperty("--wc");
+      $("winner").innerHTML = `<div class="wname">ゲーム おわり</div><div class="why">みんな しっかくに なりました</div>`;
+    }
+    const idx = game.sides.map((_, i) => i).sort((a, b) => {
+      if (a === r.winner) return -1; if (b === r.winner) return 1;
+      if (r.S[a].out !== r.S[b].out) return r.S[a].out ? 1 : -1;
+      return r.S[b].score - r.S[a].score;
+    });
+    $("rank").innerHTML = idx.map((i, k) => {
+      const s = r.S[i], sd = game.sides[i];
+      const mem = game.mode === "team" ? `<div class="mem">${sd.members.map(id => `${esc(gName(id))} ${s.pts[id] || 0}`).join("・")}</div>` : "";
+      return `<div class="rank-row" style="--sc:${sd.color}"><span class="pos">${k + 1}</span><span class="nm">${esc(label(i))}${s.out ? "（しっかく）" : ""}</span><span class="pt">${s.score}</span>${mem}</div>`;
+    }).join("");
+  }
+
+  // ---------- 操作 ----------
+  let quitArmed = false, delArmed = false, clearArmed = false;
+  document.addEventListener("click", e => {
+    const b = e.target.closest("[data-act]");
+    if (!b) return;
+    const act = b.dataset.act, id = b.dataset.id;
+    switch (act) {
+      case "mode": {
+        const to = b.dataset.v;
+        if (to === setup.mode) break;
+        if (to === "team") {
+          // こじん戦で さんかにしていた人を、人数の少ないチームに入れる
+          const size = Array(setup.teamCount).fill(0);
+          setup.order.forEach(id => { const t = setup.assign[id]; if (t >= 0 && t < setup.teamCount) size[t]++; });
+          setup.order.forEach(id => {
+            const t = setup.assign[id];
+            if (setup.solo[id] && !(t >= 0 && t < setup.teamCount)) { const m = size.indexOf(Math.min(...size)); setup.assign[id] = m; size[m]++; }
+            if (!setup.solo[id]) setup.assign[id] = -1;
+          });
+        } else {
+          setup.order.forEach(id => { const t = setup.assign[id]; setup.solo[id] = t >= 0 && t < setup.teamCount; });
+        }
+        setup.mode = to; saveSetup(); renderSetup(); break;
+      }
+      case "rule": setup.missRule = b.dataset.v; saveSetup(); renderSetup(); break;
+      case "teams": {
+        setup.teamCount = Number(b.dataset.v);
+        Object.keys(setup.assign).forEach(k => { if (setup.assign[k] >= setup.teamCount) setup.assign[k] = setup.assign[k] % setup.teamCount; });
+        saveSetup(); renderSetup(); break;
+      }
+      case "chip":
+        if (setup.mode === "team") {
+          setup.assign[id] = setup.assign[id] === brush ? -1 : brush;
+        } else setup.solo[id] = !setup.solo[id];
+        $("setup-err").textContent = "";
+        saveSetup(); renderSetup(); break;
+      case "editmode": editMode = !editMode; renderSetup(); break;
+      case "edit": delArmed = false; openEdit(id); break;
+      case "editsave": {
+        const p = players.find(x => x.id === id);
+        const v = $("edit-name").value.trim();
+        if (p && v) { p.name = v; p.adult = $("edit-adult").checked; }
+        saveSetup(); closeSheet(); renderSetup(); break;
+      }
+      case "del":
+        if (!delArmed) { delArmed = true; b.classList.add("armed"); b.textContent = "もう一度タップで けす"; break; }
+        players = players.filter(p => p.id !== id);
+        delete setup.solo[id]; delete setup.assign[id];
+        normalizeSetup(); saveSetup(); closeSheet(); renderSetup(); break;
+      case "up": moveInOrder(id, -1); saveSetup(); renderSetup(); break;
+      case "down": moveInOrder(id, 1); saveSetup(); renderSetup(); break;
+      case "shuffle": shuffle(setup.order); saveSetup(); renderSetup(); break;
+      case "auto": autoTeams(); saveSetup(); renderSetup(); break;
+      case "start": $("setup-err").textContent = startGame(); break;
+      case "pts": addPoints(Number(b.dataset.v)); break;
+      case "undo": undo(); break;
+      case "hist": openHistory(Number(b.dataset.i)); break;
+      case "menu": quitArmed = false; openMenu(); break;
+      case "rest": {
+        const k = game.rest.indexOf(id);
+        if (k >= 0) game.rest.splice(k, 1); else game.rest.push(id);
+        saveGame(); renderPlay(); openMenu(); break;
+      }
+      case "quit":
+        if (!quitArmed) { quitArmed = true; b.classList.add("armed"); b.textContent = "もう一度タップで やめる"; break; }
+        game = null; saveGame(); closeSheet(); show("setup"); break;
+      case "close": closeSheet(); break;
+      case "pick": pick = id; renderPlay(); break;
+      case "brush": brush = Number(b.dataset.v); renderSetup(); break;
+      case "tup": case "tdown": {
+        fixTeamSeq();
+        const k = Number(b.dataset.k), j = k + (act === "tup" ? -1 : 1);
+        if (j >= 0 && j < setup.teamSeq.length) [setup.teamSeq[k], setup.teamSeq[j]] = [setup.teamSeq[j], setup.teamSeq[k]];
+        saveSetup(); renderSetup(); break;
+      }
+      case "sup": case "sdown": {
+        // 新しい順番で、さいごに なげた人（チーム）の つぎから 回る
+        const seq = seqOf(game), k = Number(b.dataset.k), j = k + (act === "sup" ? -1 : 1);
+        if (j < 0 || j >= seq.length) break;
+        [seq[k], seq[j]] = [seq[j], seq[k]];
+        game.seq = seq;
+        saveGame(); renderPlay(); openMenu(); break;
+      }
+      case "age": setAge("seg-age", b.dataset.v === "adult"); break;
+      case "age2": setAge("seg-age2", b.dataset.v === "adult"); break;
+      case "clearguests":
+        if (!clearArmed) { clearArmed = true; b.textContent = "もう一度タップで けす"; setTimeout(() => { clearArmed = false; renderSetup(); }, 3000); break; }
+        clearArmed = false;
+        players = players.filter(p => !isGuest(p.id));
+        normalizeSetup(); saveSetup(); renderSetup(); break;
+      case "midadd": {
+        const name = $("mid-name").value.trim();
+        if (!name) { $("mid-name").focus(); break; }
+        const team = game.mode === "team" ? Number(b.dataset.t) : undefined;
+        const nid = addPlayer(name, addAdult, team);
+        game.names[nid] = name;
+        if (game.mode === "team") game.sides[team].members.push(nid);
+        else game.sides.push({ name, color: COLORS[game.sides.length % COLORS.length], members: [nid] });
+        saveGame(); closeSheet(); renderPlay();
+        toast(`${name} が さんか！`, game.mode === "team" ? `${game.sides[team].name}に はいりました` : "0てんから スタート");
+        break;
+      }
+      case "again": {
+        game = { ...game, log: [], rest: [], start: (game.start + 1) % game.sides.length };
+        saveGame(); show("play"); break;
+      }
+      case "change": game = null; saveGame(); show("setup"); break;
+    }
+  });
+
+  $("guest-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const v = $("guest-name").value.trim();
+    if (!v) return;
+    addPlayer(v, addAdult);
+    $("guest-name").value = "";
+    $("add-msg").textContent = `「${v}」を追加しました（${addAdult ? "おとな" : "こども"}）。つづけて入力できます`;
+    renderSetup();
+    $("guest-name").focus();
+  });
+
+  // ---------- 起動 ----------
+  if (game && game.sides && game.log) show(compute(game).over ? "result" : "play");
+  else show("setup");
+})();
+</script>
+
+<script>
+  // オフライン対応（http(s) で開いたときだけ。claude.ai の Artifact やファイル直開きでは何もしない）
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol) && !/claude\.ai|claudeusercontent/.test(location.hostname)) {
+    addEventListener("load", () => { navigator.serviceWorker.register("./sw.js").catch(() => {}); });
+  }
+</script>
+</body>
+</html>
