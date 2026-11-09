@@ -5,7 +5,7 @@
  * フォント（Google Fonts）は変わらないので キャッシュ優先にする。
  * ファイルを増やしたら ASSETS に足し、CACHE_NAME の番号を上げること。
  */
-const CACHE_NAME = 'molkky-v1';
+const CACHE_NAME = 'molkky-v2';
 const ASSETS = [
   './',
   './index.html',
